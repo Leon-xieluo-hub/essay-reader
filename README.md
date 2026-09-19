@@ -8,19 +8,19 @@ The interface is a low-distraction cream-and-pale-yellow reading theme. Papers, 
 
 > The application UI is in Simplified Chinese; this document is the English overview.
 
-<!-- Screenshots — move the comment markers once images/ is populated (see images/README.md)
-
 ## Screenshots
 
-| Reading view | Original page with block highlight |
-| --- | --- |
-| ![Reading view](images/reading-view.png) | ![Original page](images/original-page.png) |
+**Reading view** — the paper on the left, translation inline underneath; the top bar carries the active channel, the usage counter and the running cost. Both a light (cream) and a dark theme are available.
 
-| Translation dock and cost | Settings and channel setup |
-| --- | --- |
-| ![Translation dock](images/translation-dock.png) | ![Settings](images/settings.png) |
+![Reading view with inline translation](images/reading-view.png)
 
--->
+**Original page mode** — the real page rendered with pdf.js beside the outline; selecting a paragraph highlights its region, which is the most reliable way to verify parsing and figure placement.
+
+![Original page mode](images/original-page.png)
+
+| Library | Settings |
+| --- | --- |
+| ![Library with per-paper parse quality](images/library.png) | ![Settings: channels, local model, OCR, cloud API](images/settings.png) |
 
 ---
 

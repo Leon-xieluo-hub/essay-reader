@@ -1,20 +1,14 @@
 # Screenshots
 
-Drop the screenshots here, then remove the `<!-- -->` markers around the
-"Screenshots" section at the top of `README.md` (and of `README.zh-CN.md` if you
-add a Chinese section there too).
+Images referenced by the "Screenshots" section of `README.md` and `README.zh-CN.md`.
 
-Suggested files and what each should show:
-
-| File | Suggested content |
+| File | Shows |
 | --- | --- |
-| `reading-view.png` | Reading view with a translated paragraph, figure inlined |
-| `original-page.png` | "Original page" mode with a selected block highlighted |
-| `translation-dock.png` | Translation dock: channel switcher, progress and cost estimate |
-| `settings.png` | Settings: channel setup and local model management |
-| `parse-quality.png` | "Parse quality" panel (coverage, garbage ratio, paragraph count) |
+| `reading-view.png` | Reading view: English body with the Chinese translation inline, top bar with channel + usage counter (light theme) |
+| `original-page.png` | Original-page mode: the real page rendered with pdf.js beside the outline (dark theme) |
+| `library.png` | Library: upload drop zone and per-paper parse quality (dark theme) |
+| `settings.png` | Settings: channels, local model management, OCR fallback, cloud API (dark theme) |
 
-Guidelines: capture at a window width of about 1400 px, save as PNG, and crop out
-anything you do not want public (file names in the library list, for instance).
-Screenshots of the Simplified-Chinese UI are expected — that is the app's
-interface language.
+Capture notes for replacements: window width ~1400 px, PNG, and crop out anything
+you do not want public (the top bar shows a usage counter and cost, and the paper
+titles are visible in the library list and reading view).
