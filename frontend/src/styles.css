@@ -1,0 +1,347 @@
+@import "tailwindcss";
+
+/* ------------------------------------------------------------------ theme
+   Cream + pale-yellow reading palette. Every colour used by the UI comes from
+   these tokens so the "纸质书 + 便签" feel stays consistent and tunable. */
+
+@theme {
+  --font-serif: "Source Serif 4", "Noto Serif SC", "Songti SC", "SimSun", Georgia, serif;
+  --font-sans: "Inter", "Noto Sans SC", "PingFang SC", "Microsoft YaHei", system-ui, sans-serif;
+  --font-mono: "JetBrains Mono", "Cascadia Code", Consolas, monospace;
+
+  /* paper / surface */
+  --color-paper: #faf7f0;
+  --color-paper-2: #f5f1e8;
+  --color-paper-3: #efe9dc;
+  --color-surface: #fffdf8;
+
+  /* pale yellow accent */
+  --color-accent: #f7e7a6;
+  --color-accent-strong: #efd98a;
+  --color-accent-soft: #fbf3d5;
+
+  /* ink */
+  --color-ink: #2e2a24;
+  --color-ink-2: #6b6459;
+  --color-ink-3: #9a9188;
+
+  /* lines + states */
+  --color-line: #e6dfd0;
+  --color-line-2: #d8cfbc;
+  --color-ok: #7c9a6d;
+  --color-warn: #c89b54;
+  --color-danger: #b5645a;
+  --color-info: #7a8ba0;
+
+  --radius-card: 14px;
+  --shadow-soft: 0 1px 2px rgb(46 42 36 / 0.04), 0 8px 24px -16px rgb(46 42 36 / 0.18);
+}
+
+/* Dark mode: warm charcoal, never pure black, accent stays pale yellow. */
+@custom-variant dark (&:where([data-theme="dark"], [data-theme="dark"] *));
+
+:root[data-theme="dark"] {
+  --color-paper: #211e1a;
+  --color-paper-2: #272320;
+  --color-paper-3: #2f2a25;
+  --color-surface: #2b2723;
+  --color-accent: #6a5a2a;
+  --color-accent-strong: #8a7538;
+  --color-accent-soft: #3a3325;
+  --color-ink: #ece5d8;
+  --color-ink-2: #b3a99a;
+  --color-ink-3: #8a8175;
+  --color-line: #3a342d;
+  --color-line-2: #4a4239;
+  --color-ok: #8fae7e;
+  --color-warn: #d8b06a;
+  --color-danger: #cc7b70;
+  --color-info: #93a4b8;
+  --shadow-soft: 0 1px 2px rgb(0 0 0 / 0.3), 0 8px 24px -16px rgb(0 0 0 / 0.6);
+}
+
+html,
+body,
+#root {
+  height: 100%;
+}
+
+body {
+  margin: 0;
+  background: var(--color-paper);
+  color: var(--color-ink);
+  font-family: var(--font-sans);
+  -webkit-font-smoothing: antialiased;
+  text-rendering: optimizeLegibility;
+}
+
+/* --------------------------------------------------------------- reading */
+
+.reading-body {
+  font-family: var(--font-serif);
+  line-height: 1.78;
+  font-size: 1.0625rem;
+  letter-spacing: 0.01em;
+  color: var(--color-ink);
+}
+
+.reading-body ::selection {
+  background: var(--color-accent-strong);
+  color: var(--color-ink);
+}
+
+.para {
+  position: relative;
+  border-radius: 10px;
+  transition: background-color 140ms ease, box-shadow 140ms ease;
+}
+
+.para-hover:hover {
+  background: color-mix(in srgb, var(--color-accent-soft) 55%, transparent);
+}
+
+.para-active {
+  background: color-mix(in srgb, var(--color-accent) 42%, transparent);
+  box-shadow: inset 3px 0 0 var(--color-accent-strong);
+}
+
+.para-suspect {
+  box-shadow: inset 3px 0 0 var(--color-warn);
+}
+
+.para-failed {
+  box-shadow: inset 3px 0 0 var(--color-danger);
+}
+
+.pdf-page-highlight {
+  position: absolute;
+  background: color-mix(in srgb, var(--color-accent) 45%, transparent);
+  border: 1px solid var(--color-accent-strong);
+  border-radius: 3px;
+  pointer-events: none;
+}
+
+/* ----------------------------------------------------------------- tables */
+
+.doc-table {
+  width: 100%;
+  border-collapse: collapse;
+  font-family: var(--font-sans);
+  font-size: 0.875rem;
+}
+
+.doc-table th,
+.doc-table td {
+  border: 1px solid var(--color-line);
+  padding: 6px 10px;
+  text-align: left;
+  vertical-align: top;
+}
+
+.doc-table tr:first-child th {
+  background: var(--color-paper-3);
+  font-weight: 600;
+}
+
+.doc-table tr:nth-child(even) td {
+  background: color-mix(in srgb, var(--color-paper-2) 60%, transparent);
+}
+
+/* --------------------------------------------------------------- controls */
+
+.btn {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  border-radius: 9px;
+  border: 1px solid var(--color-line);
+  background: var(--color-surface);
+  color: var(--color-ink);
+  padding: 6px 11px;
+  font-size: 0.8125rem;
+  line-height: 1.2;
+  cursor: pointer;
+  transition: background-color 120ms ease, border-color 120ms ease, transform 120ms ease;
+}
+
+.btn:hover:not(:disabled) {
+  background: var(--color-accent-soft);
+  border-color: var(--color-accent-strong);
+}
+
+.btn:active:not(:disabled) {
+  transform: translateY(1px);
+}
+
+.btn:disabled {
+  opacity: 0.5;
+  cursor: not-allowed;
+}
+
+.btn-primary {
+  background: var(--color-accent);
+  border-color: var(--color-accent-strong);
+  font-weight: 600;
+}
+
+.btn-primary:hover:not(:disabled) {
+  background: var(--color-accent-strong);
+}
+
+.btn-ghost {
+  background: transparent;
+  border-color: transparent;
+}
+
+.btn-ghost:hover:not(:disabled) {
+  background: color-mix(in srgb, var(--color-accent-soft) 70%, transparent);
+  border-color: transparent;
+}
+
+.btn[data-active="true"] {
+  background: var(--color-accent);
+  border-color: var(--color-accent-strong);
+  font-weight: 600;
+}
+
+.input,
+.select,
+.textarea {
+  border-radius: 9px;
+  border: 1px solid var(--color-line);
+  background: var(--color-surface);
+  color: var(--color-ink);
+  padding: 6px 10px;
+  font-size: 0.875rem;
+  font-family: var(--font-sans);
+  outline: none;
+  width: 100%;
+}
+
+.input:focus,
+.select:focus,
+.textarea:focus {
+  border-color: var(--color-accent-strong);
+  box-shadow: 0 0 0 3px color-mix(in srgb, var(--color-accent) 45%, transparent);
+}
+
+.card {
+  background: var(--color-surface);
+  border: 1px solid var(--color-line);
+  border-radius: var(--radius-card);
+  box-shadow: var(--shadow-soft);
+}
+
+.chip {
+  display: inline-flex;
+  align-items: center;
+  gap: 5px;
+  border-radius: 999px;
+  border: 1px solid var(--color-line);
+  background: var(--color-paper-2);
+  padding: 2px 9px;
+  font-size: 0.6875rem;
+  color: var(--color-ink-2);
+  white-space: nowrap;
+}
+
+.chip-accent {
+  background: var(--color-accent-soft);
+  border-color: var(--color-accent-strong);
+  color: var(--color-ink);
+}
+
+.chip-warn {
+  background: color-mix(in srgb, var(--color-warn) 18%, transparent);
+  border-color: var(--color-warn);
+  color: var(--color-ink);
+}
+
+.chip-danger {
+  background: color-mix(in srgb, var(--color-danger) 16%, transparent);
+  border-color: var(--color-danger);
+  color: var(--color-ink);
+}
+
+.chip-ok {
+  background: color-mix(in srgb, var(--color-ok) 18%, transparent);
+  border-color: var(--color-ok);
+  color: var(--color-ink);
+}
+
+/* ------------------------------------------------------------ scrollbars */
+
+* {
+  scrollbar-width: thin;
+  scrollbar-color: var(--color-line-2) transparent;
+}
+
+*::-webkit-scrollbar {
+  width: 10px;
+  height: 10px;
+}
+
+*::-webkit-scrollbar-thumb {
+  background: var(--color-line-2);
+  border-radius: 999px;
+  border: 3px solid transparent;
+  background-clip: content-box;
+}
+
+*::-webkit-scrollbar-track {
+  background: transparent;
+}
+
+/* ---------------------------------------------------------------- utility */
+
+.skeleton {
+  background: linear-gradient(
+    90deg,
+    var(--color-paper-2) 25%,
+    var(--color-paper-3) 37%,
+    var(--color-paper-2) 63%
+  );
+  background-size: 400% 100%;
+  animation: shimmer 1.4s ease-in-out infinite;
+  border-radius: 6px;
+}
+
+@keyframes shimmer {
+  0% {
+    background-position: 100% 50%;
+  }
+  100% {
+    background-position: 0 50%;
+  }
+}
+
+.fade-in {
+  animation: fade-in 220ms ease both;
+}
+
+@keyframes fade-in {
+  from {
+    opacity: 0;
+    transform: translateY(3px);
+  }
+  to {
+    opacity: 1;
+    transform: none;
+  }
+}
+
+mark.hit {
+  background: var(--color-accent-strong);
+  color: var(--color-ink);
+  border-radius: 3px;
+  padding: 0 1px;
+}
+
+mark.hit-active {
+  background: var(--color-warn);
+}
+
+.katex-display {
+  overflow-x: auto;
+  overflow-y: hidden;
+}

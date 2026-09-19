@@ -1,0 +1,22 @@
+# 依赖与构建产物
+node_modules/
+dist/
+__pycache__/
+*.pyc
+.venv/
+venv/
+
+# 本地数据（文献、译文、图表裁切、数据库）
+backend/data/
+*.sqlite3
+
+# 环境与临时文件
+.env
+.dsh-tmp/
+*.log
+
+# 编辑器
+.vscode/
+.idea/
+.DS_Store
+Thumbs.db
