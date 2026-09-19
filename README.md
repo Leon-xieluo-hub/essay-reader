@@ -1,247 +1,263 @@
-# Essay Reader · 文献阅读器
+**English** | [简体中文](README.zh-CN.md)
 
-本地优先的学术文献阅读工具：上传 PDF → 精准解析 → 双通道翻译（本地免费离线 / 云端更准）→ 结构化要点 → 带出处的问答。
+# Essay Reader
 
-界面为米白 + 淡黄的低干扰阅读风格；文献、译文、笔记全部留在本机，**除首次下载本地模型权重与可选的云端调用外，运行期不产生任何外部网络请求，也不采集任何使用数据**。
+A local-first reader for academic PDFs: upload a paper → accurate layout parsing → dual-channel translation (free offline local model, or a cloud model when accuracy matters) → structured summaries → Q&A with citations.
+
+The interface is a low-distraction cream-and-pale-yellow reading theme. Papers, translations and notes stay on your machine: **apart from the one-time download of local model weights and optional cloud calls, the app makes no outbound network requests at runtime and collects no usage data.**
+
+> The application UI is in Simplified Chinese; this document is the English overview.
+
+<!-- Screenshots — move the comment markers once images/ is populated (see images/README.md)
+
+## Screenshots
+
+| Reading view | Original page with block highlight |
+| --- | --- |
+| ![Reading view](images/reading-view.png) | ![Original page](images/original-page.png) |
+
+| Translation dock and cost | Settings and channel setup |
+| --- | --- |
+| ![Translation dock](images/translation-dock.png) | ![Settings](images/settings.png) |
+
+-->
 
 ---
 
-## 快速开始
+## Quick start
 
-### 从 GitHub 克隆后
+### Clone and install
 
 ```powershell
 git clone https://github.com/Leon-xieluo-hub/essay-reader.git
 cd essay-reader
-powershell -ExecutionPolicy Bypass -File .\scripts\setup.ps1   # 安装依赖并构建前端
+powershell -ExecutionPolicy Bypass -File .\scripts\setup.ps1   # install deps + build the UI
 ```
 
-### 第一次：安装依赖
+### First-time install (already cloned)
 
 ```powershell
 powershell -ExecutionPolicy Bypass -File .\scripts\setup.ps1
 ```
 
-### 以后每次启动（任选一种）
+### Launch (every time after that)
 
-- **双击根目录的「启动文献阅读器.cmd」**（推荐，最简单）
-- 或在终端：`powershell -ExecutionPolicy Bypass -File .\start.ps1`
+- **Double-click `启动文献阅读器.cmd` in the project root** (easiest)
+- Or from a terminal: `powershell -ExecutionPolicy Bypass -File .\start.ps1`
 
-启动器会自动处理这些事：构建缺失的前端、**清理占用端口的旧实例**、载入 `.env`、等服务就绪后打开浏览器，并在窗口里打印地址。**关闭那个窗口即停止服务。**
+The launcher builds the UI when it is missing, **stops a stale instance holding the port**, loads `.env`, waits for the server to come up, opens the browser and prints the address in its window. **Closing that window stops the server.**
 
-打开 <http://127.0.0.1:8787>，把 PDF 拖进左侧的虚线框即可。
+Open <http://127.0.0.1:8787> and drop a PDF onto the dashed box on the left.
 
-> 服务不会开机自启、也不常驻后台：要用的时候运行一次启动器即可。本地工具没必要留常驻进程。
+> There is no auto-start and no background service: run the launcher when you need the app. A local tool does not need a resident process.
 >
-> 排查思路：打不开先看启动器窗口里打印的地址；如果窗口一闪而过，多半是端口被占（启动器会自动清理）或依赖缺失，把窗口里的报错发出来即可。
+> Troubleshooting: if the page does not open, first read the address printed in the launcher window. If the window flashes and closes, the port is usually occupied (the launcher clears it) or a dependency is missing — paste the error text from that window.
 >
-> 给维护者：`start.ps1` / `scripts\*.ps1` 必须保存为 **UTF-8 with BOM**。Windows PowerShell 5.1 在无 BOM 时按 ANSI 解码，中文注释会被解成乱码并导致语法错误（这个坑已经踩过一次）。
+> For maintainers: `start.ps1` and `scripts\*.ps1` must be saved as **UTF-8 with BOM**. Without a BOM, Windows PowerShell 5.1 decodes them as ANSI, turns the Chinese comments into mojibake and fails to parse the script (we have hit this once).
 
-开发模式（前端热更新）：`start.ps1 -Dev`，另开一个终端 `cd frontend; npm run dev`，访问 <http://127.0.0.1:5173>。
+Development mode (frontend hot reload): `start.ps1 -Dev`, plus `cd frontend; npm run dev` in a second terminal → <http://127.0.0.1:5173>.
 
-### 手动安装（如果不想用脚本）
+### Manual install (without the helper scripts)
 
 ```powershell
-# 后端依赖
+# backend dependencies
 python -m pip install --index-url https://pypi.org/simple fastapi "uvicorn[standard]" pymupdf python-multipart
 
-# 前端构建
+# build the frontend
 cd frontend; npm install; npm run build; cd ..
 
-# 启动
+# run
 $env:PYTHONPATH = "$PWD\backend"
 python -m uvicorn app.main:app --host 127.0.0.1 --port 8787
 ```
 
-> 若 pip 报 `Could not find a version that satisfies the requirement ... (from versions: none)`，
-> 说明本机 pip 配置的镜像不可用，用 `-i https://pypi.org/simple` 指定官方源即可。
+> If pip reports `Could not find a version that satisfies the requirement ... (from versions: none)`, your configured mirror is unreachable; point it at the official index with `-i https://pypi.org/simple`.
 
 ---
 
-## 双通道与场景分工
+## Two channels, two jobs
 
-| 场景 | 推荐通道 | 说明 |
+| Task | Recommended channel | Notes |
 | --- | --- | --- |
-| 整篇翻译、日常批量阅读 | **本地模型** | 零 token、零费用、数据不出本机；长难句与术语建议复核（可疑段落会被标出） |
-| 重要文献精读、总结、追问 | **云端模型** | 更准确更快，按 token 计费；翻译前给出预估费用，可设单篇预算上限 |
-| 只读不译 | **关闭 AI** | 纯阅读模式：解析、阅读、搜索、笔记、图表全部可用，零网络 |
+| Whole-paper translation, everyday bulk reading | **Local model** | Zero tokens, zero cost, data never leaves the machine; review long or ambiguous sentences (paragraphs flagged as suspect are marked) |
+| Close reading, summaries and follow-up questions on important papers | **Cloud model** | More accurate and faster, billed per token; the cost is estimated before you start and a per-paper budget cap is available |
+| Reading only | **AI off** | Pure reading mode: parsing, reading, search, notes and figures all work with no network at all |
 
-两种通道共用同一套**术语表**与**段落级缓存**，随时切换不丢工作；已在另一通道翻译过的段落会直接复用。
-断网时云端入口自动置灰并说明原因，**不会静默降级**（避免你在不知情下拿到质量更低的译文）。
+Both channels share one **glossary** and one **per-paragraph cache**, so switching never loses work: paragraphs already translated by the other channel are reused.
+When the machine is offline, the cloud entry point is greyed out with the reason shown — the app **never silently degrades** you to a lower-quality result without saying so.
 
-### 启用本地模型（一次性，之后永久离线）
+### Enable the local model (one-time, offline forever after)
 
-1. 安装 [Ollama](https://ollama.com/download)（Windows 一键安装包）。
-2. 打开应用 → 设置 → 「本地模型管理」→ 填写模型名（默认 `qwen3:8b`）→ **下载 / 更新此模型**，应用内会显示进度（约 4~5 GB，仅此一次需要联网）。
-3. 顶栏通道菜单切到「本地模型」。
+1. Install [Ollama](https://ollama.com/download) (one-click installer on Windows).
+2. Open the app → Settings → "Local model" → enter a model name (default `qwen3:8b`) → **Download / update this model**. Progress is shown inside the app (~4–5 GB; the only step that needs the internet).
+3. Switch the channel menu in the top bar to "Local model".
 
-无外网环境：在能联网的机器上执行 `ollama pull qwen3:8b`，把 `%USERPROFILE%\.ollama\models` 整体拷贝到目标机器同一路径即可。
+Machine with no internet at all: run `ollama pull qwen3:8b` on a connected machine, then copy `%USERPROFILE%\.ollama\models` to the same path on the target machine.
 
-**显存建议**：8 GB 显存推荐 8B 级 + Q5/Q6 量化。宁可小模型高精度量化，也不要大模型激进量化 —— 量化对术语与数字保真的伤害大于参数规模的差异。
+**VRAM guidance**: with 8 GB of VRAM, prefer an 8B-class model at Q5/Q6. A smaller model at higher precision beats a bigger model quantised aggressively — aggressive quantisation hurts terminology and number fidelity more than the parameter count helps.
 
-### 启用云端模型
+### Enable the cloud model
 
-设置 → 云端 API：填 Base URL、模型名、API Key（兼容任何 OpenAI 格式端点，如 DeepSeek / OpenAI / 自建中转）。
-密钥只保存在本机后端，界面只显示「是否已配置」，不会回显。
+Settings → Cloud API: fill in Base URL, model name and API key (any OpenAI-compatible endpoint works: DeepSeek / OpenAI / your own proxy).
+The key is stored only in the local backend; the UI only reports whether one is configured and never echoes the value.
 
-> **配置会持久化**：保存后写入本机 SQLite（`settings` 表），重启应用时自动重新加载，
-> 所以云端 Key / 模型名 / 并发等不会因重启丢失。保存时留空**不会**覆盖已存的密钥。
-> 可用 `GET /api/settings/stored` 查看哪些项已落库（不返回密钥值）。
+> **Settings persist.** They are written to the local SQLite `settings` table and reloaded at startup, so the cloud key, model names and concurrency survive a restart. Saving with a blank key does **not** overwrite the stored one. `GET /api/settings/stored` lists which settings are persisted (never the key value).
 
 ---
 
-## 三大难点的处理方式
+## How the three hard problems are handled
 
-### 1. PDF 难以解析
+### 1. PDFs are hard to parse
 
-- **双栏识别**：不靠"猜空白带"，而是找**第二块文本的重复行首**（既覆盖经典双栏，也覆盖 MDPI/Frontiers 那种"窄侧栏 + 正文"的版式），跨栏的大标题、宽表格因为只统计行首而不影响判定。检测到窄栏（宽度 < 正文栏 62%）时，栏内内容一律归入 `meta` —— 页边文章信息栏、引文信息、参考文献行号都属于这类。
-- **文章信息（article info）单独成区**：`Citation:` / `Received:` / `Keywords:` / `Academic Editor:` 这类出版商标注被识别为独立的 `meta` 类型，**不进入正文流**：阅读区把它汇总成正文上方的一块「文章信息」，翻译、总结、搜索都不会把它当正文处理。当元信息栏与正文栏在水平方向交错、导致某个碎片被粘进正文句子时（例如 `…cultivation research, and Yang, W.; Zhai, R. 3DPhenoMVS: A`），后处理会把它拆出来单独成块。
-- **期刊名不再穿插正文**：MDPI 等出版商会把 "Agronomy 2022, 12, 1865" 重复印在页面中部，位置规则抓不到；改用"同一文本重复 ≥3 次 + 字号不大于正文"判定，统一标记为页眉并移出正文流。
-- **无框线表格还原**：很多期刊表格只有上下两条横线、没有竖线，PyMuPDF 的表格检测完全抓不到（本文档全篇 0 个表格）。兜底方案是把同一基线上的多个文本片段合并成行、按 12pt 以上的列间隙切单元格，再要求列位置在多数行上对齐；同时用"公式/参考文献"特征否决误判（否则公式和参考文献列表会被当成表格）。实测该文档的 17 行两列表格被完整还原。
-- **公式按原版面截取**：PDF 文本层返回的公式是**乱序**的——上下标、大括号、求和限会各自成为独立行（`\x1a \x1b b∈B ∥a −b ∥ h(A, B) = max min`），任何文本后处理都无法可靠还原。因此改为按**区域**检测公式带并整块截取为图片，在正文原位内联显示、点击可放大；同时保留原始文本用于搜索。截取区域内的正文行会被保留，标题行不会被吞掉。
-- **目录净化**：跑头（`5 of 17`）、测量值（`0.72 to 0.97`）、日期元数据、图注、符号碎片一律不进目录；跨行大标题合并为一条 L1；品牌碎词（`agronomy` / `Heliyon` / `Winter`）通过字号层级与"编号章节优先"规则剔除 —— 有编号章节的论文，目录只保留编号章节 + 标题；编号列表项因字号明显小于真标题也会被剔除；**数字开头的章节**（`2.8. 3D Point Cloud from Active Sensors`）以及**被粘在后续句子前的标题**都能正确进入目录。
-- **扫描件 OCR 兜底**：没有文本层（或正文极少但整页被栅格图覆盖）的页面自动转走 **RapidOCR（ONNX，CPU，完全离线）**，识别结果按行并入同一套版面逻辑（栏检测、段落合并、标题判定），因此扫描件也能翻译与总结。OCR 页数、平均置信度会写进解析自检，并在质量分中扣减 —— 不会把识别结果伪装成干净的文本层。上传界面上有开关，设置里可选 `自动 / 强制 / 关闭`。
-- **表格先剥离**：先用 `page.find_tables()` 找出表格区域，把落在区域内的文本行从正文流中剔除，避免表格单元格被当成正文、甚至凭空造出"第二栏"；表格本身还原为结构化行列 + HTML，界面里可横向滚动，也可切「原版页」对照。同一步还会否决"假表格"——若候选区域里的文本是满宽成行的（例如参考文献区），就不当作表格。
-- **无框线表格还原**：只有上下横线、没有竖线的表格（很多期刊表格如此）PyMuPDF 完全检测不到。兜底方案是把同一基线上的多个文本片段合并成行、按 ≥12pt 的列间隙切单元格，并要求列位置在多数行上对齐；同时用"公式/参考文献"特征否决误判。实测该文档 17 行两列表格被完整还原，且翻译后保持行列对应（表头 → `性状/缩写`，缩写 `PH`/`PW` 保持原样）。
-- **公式按原版面截取**：文本层的公式是乱序的（上下标、大括号、求和限各自成行），因此按**公式编号 `(n)` 为锚点**逐张截取为图片：编号所在基线附近的片段即该公式内容，相邻公式各成一张图，不会连在一张里；截取时取该行完整水平范围，避免左端被切掉。实测 4 张公式图（含 MAPE 求和公式）全部完整。
-- **阅读顺序**：整行块先成段，然后按「栏号 → y」排序，保证左栏读完再读右栏，而不是逐行左右横跳。**非正文块（文章信息 / 页眉 / 期刊名）被统一提到正文之前**，正文中间不再穿插元信息或刊名。
-- **图表裁切**：按 bbox 以 200 DPI 渲染裁切为 PNG，自动绑定最近的图注（caption），点击可放大；过小的图片（logo、横线、印章）按面积比过滤。
-- **段落与标题修复**：断行连字符（`hyphen-\nation`）自动接合；页眉页脚与页码识别为独立类型、不参与翻译；被粘进正文的标题行会在行边界处拆回标题；嵌在正文段落中间的元信息行也会被拆出（而不是把整段误判成元信息）。
-- **解析自检**：输出文本覆盖率、乱码率、段落数、图表数、版面判定与耗时，在侧栏「解析质量」里如实展示，并给出质量分。解析结果按文件 SHA-256 缓存，同一文件不会重复解析。
+- **Two-column detection**: instead of guessing a whitespace gutter, we look for **repeated line starts in a second text block**, which covers both the classic two-column layout and the "narrow side rail + body" layout used by MDPI and Frontiers; full-width titles and tables only count line starts, so they do not disturb the decision. When the detected rail is narrow (width < 62% of the body column), its content is classified as `meta` — margin article info, citation metadata and reference line numbers all fall into that group.
+- **Article info becomes its own region**: publisher labels such as `Citation:` / `Received:` / `Keywords:` / `Academic Editor:` are recognised as a distinct `meta` type and **kept out of the body flow**. The reading pane collects them into one "Article info" card above the text, and translation, summarisation and search never treat them as body text. When the metadata rail interleaves horizontally with the body and a fragment gets glued into a body sentence (e.g. `…cultivation research, and Yang, W.; Zhai, R. 3DPhenoMVS: A`), post-processing splits it back out.
+- **Journal names no longer cut through the body**: publishers such as MDPI reprint "Agronomy 2022, 12, 1865" in the middle of the page, where positional rules cannot catch it. We use "same text repeated ≥3 times + font size not larger than body" instead and move it out of the body flow as a running head.
+- **Borderless tables are reconstructed**: many journal tables only have a top and a bottom rule and no vertical lines, so PyMuPDF's table detection finds nothing at all (0 tables for the whole test paper). The fallback merges text fragments on the same baseline into rows, splits cells on column gaps ≥12 pt, and requires column positions to align across most rows; "formula / reference list" signatures veto false positives (otherwise equations and reference lists turn into tables). On the test paper the 17-row two-column table is reconstructed completely, and translation keeps the row/column correspondence (header → `性状/缩写`, abbreviations such as `PH`/`PW` untouched).
+- **Tables are stripped first**: `page.find_tables()` marks table regions, and text lines inside them are removed from the body flow so cells are not read as prose and cannot invent a phantom "second column". The table itself is rebuilt as structured rows/columns plus HTML, scrollable in the UI and comparable against the original page. The same step rejects "fake tables": if the text in a candidate region runs full width (a reference list, say), it is not treated as one.
+- **Display equations are cropped as images**: the text layer returns equations **scrambled** — sub/superscripts, braces and summation limits each become separate lines (`\x1a \x1b b∈B ∥a −b ∥ h(A, B) = max min`), and no text post-processing can restore them reliably. Equations are therefore located by region, anchored on the **equation number `(n)`**: fragments near that baseline are the equation body, each equation becomes its own image (they are never merged), and the crop spans the full horizontal extent of the line so the left edge is not cut off. Images are inlined at their position in the text, click to enlarge, and the original text stays available for search. Body lines inside the cropped region are preserved and heading lines are never swallowed. On the test paper all 4 equation images (including the MAPE summation) come out complete.
+- **Reading order**: full-width blocks form paragraphs first, then everything is sorted by (column → y), so a left column is read to its end before the right one instead of bouncing line by line. **Non-body blocks (article info / running heads / journal names) are hoisted ahead of the body**, so metadata no longer interrupts the middle of a paragraph.
+- **Figure and table cropping**: rendered from the bounding box at 200 DPI into PNG and bound to the nearest caption; click to enlarge. Very small images (logos, rules, stamps) are filtered out by area ratio.
+- **Paragraph and heading repair**: hyphenated line breaks (`hyphen-\nation`) are joined; running heads, footers and page numbers become their own block types and are not translated; heading lines glued into body text are split back out at the line boundary; metadata lines embedded in the middle of a paragraph are extracted instead of misclassifying the whole paragraph.
+- **Parsing self-check**: text coverage, garbage ratio, paragraph count, figure/table counts, layout verdict and elapsed time are reported honestly in the "Parse quality" panel together with a quality score. Parse results are cached by file SHA-256, so the same file is never parsed twice.
 
-### 2. 翻译容易出错
+### 2. Translation goes wrong easily
 
-- **占位符保护**：翻译前把公式、引用 `[12]`、DOI、URL、图号 `Fig. 3`、**日期**（`1 February 2020` / `2020-06-29`）与数字等替换为 `<ph id="n"/>`，翻译后精确回填；丢失的占位符会补回原文并记录告警。日期必须整体保护：模型被要求翻译 `1 February 2020` 时会稳定地写出「1 年 2020 月」。`3D` / `2D` 这类「数字+字母」短标记也作为一个整体保护（只遮数字会把它切成 `<ph id="0"/>D`，模型一旦挪动标签就会在中文里留下孤立的 `3`），而 `3DPhenoMVS` 这种词内数字则不遮，保证专有名词完整。
-- **只翻译有内容的块**：遮掉受保护片段后若不再剩任何字母/汉字，该块直接跳过（编号列表 `5. 6. 7. …`、纯链接行、公式块）。此前这类块会被送去翻译，产出「5。6。7。」这种无意义结果并白花 token。
-- **术语表**：自动抽取术语并统一译法，翻译时强制注入；可在界面增删改，改完对新翻译立即生效。
-- **上下文感知分块**：按 token 预算切块，切点落在段落边界，每块携带文档标题、术语表与前文若干段，降低指代错误。
-- **质量校验回路**：逐段检查占位符与引用数量、数字是否丢失、译文字数比例（漏译/扩写）、是否真的译成了目标语言；不合格自动重译一次并附上失败原因，仍不合格则标记为「待复核」，在正文左侧显示黄色标记，并提供一键用云端重译该段。长度比阈值按中文压缩率校准（技术中文约为英文的 25–40%），过紧会把正确译文全部误标。
-- **表格按网格翻译**：表格不作为正文参与分块，而是整表以 JSON 行列发给模型，并要求返回**完全相同的行列数**——行列错位会让数据张冠李戴，所以形状不符直接判失败。单元格同样走占位符保护，数字与缩写保持原样。
-- **本地模型强制校验**：本地通道下质量校验不可关闭，因为小模型在数字与引用上的出错率明显更高。
+- **Placeholder protection**: before translation, equations, citations `[12]`, DOIs, URLs, figure references `Fig. 3`, **dates** (`1 February 2020` / `2020-06-29`) and numbers are replaced with `<ph id="n"/>` and restored exactly afterwards; a lost placeholder is refilled from the source and reported. Dates must be protected as a whole: asked to translate `1 February 2020`, a model reliably writes "1 年 2020 月". Short digit+letter tokens such as `3D` / `2D` are protected as one unit (masking only the digit splits them into `<ph id="0"/>D`, and a model that reflows the tag leaves an orphan `3` in the Chinese sentence), while digits inside words such as `3DPhenoMVS` are left alone so proper nouns stay intact.
+- **Only blocks with content are translated**: if nothing but protected fragments remains (numbered lists like `5. 6. 7. …`, bare URL lines, formula blocks), the block is skipped. Sending them anyway produced meaningless output such as "5。6。7。" and burned tokens.
+- **Glossary**: terms are extracted automatically and enforced during translation; you can add, edit or remove terms in the UI and the change applies to the next translation immediately.
+- **Context-aware chunking**: text is split into chunks by token budget, at paragraph boundaries, and each chunk carries the document title, the glossary and the preceding paragraphs to reduce pronoun and reference errors.
+- **Quality gate with a retry loop**: every paragraph is checked for placeholder and citation counts, lost numbers, length ratio (omission or hallucinated expansion) and whether it was actually translated into the target language. A failing paragraph is retried once with the failure reason attached; if it still fails it is marked "needs review", flagged in yellow next to the text, and offered a one-click cloud retranslation. The length-ratio floor is calibrated for Chinese compression (technical Chinese runs at 25–40% of the English character count); a tighter bound flagged every correct translation.
+- **Tables are translated as a grid**: a table never joins a prose chunk; the whole grid is sent as JSON and must come back with **exactly the same row and column counts** — a shifted row would silently attribute data to the wrong subject, so a shape mismatch fails immediately. Cells go through the same placeholder protection, so numbers and abbreviations stay as they are.
+- **Validation cannot be disabled on the local channel**, because small models make noticeably more mistakes with numbers and citations.
 
-### 3. 图片与表格难以呈现
+### 3. Figures and tables are hard to present
 
-- 图片原位内联显示、点击灯箱放大、图注随正文翻译；
-- 表格保留行列结构（表头/表体区分、脚注保留），支持横向滚动，并可切「查看原图」核对；
-- 公式可转 LaTeX 的用 KaTeX 渲染，不能转的保留原文并提示切「原版页」；
-- 「原版页」模式用 pdf.js 渲染真实页面，选中段落会在页面上高亮对应区域 —— 这是核对解析与图表位置最可靠的手段。
+- Images are inlined where they belong, click to open a lightbox, captions are translated with the body text;
+- Tables keep their row/column structure (header separated from body, footnotes preserved), scroll horizontally, and offer a "view original" comparison;
+- Equations that can be converted to LaTeX are rendered with KaTeX; the rest keep their original image plus a hint to switch to the original page;
+- The "original page" mode renders the real page with pdf.js, and selecting a paragraph highlights its region on the page — the most reliable way to verify parsing and figure placement.
 
 ---
 
-## 目录结构
+## Project layout
 
 ```
 backend/
   app/
-    config.py            环境变量与运行时可调设置
-    schemas.py           Document IR / API 契约（与前端 types.ts 一一对应）
-    db.py                SQLite：documents/blocks/translations/glossary/notes/summaries/usage
-    parsing/pdf_parser.py  PDF → IR：版面、阅读顺序、图表裁切、表格还原、解析自检
-    providers/__init__.py  双通道抽象：Ollama(local) / OpenAI 兼容(cloud) / off
-    services/protect.py    占位符保护与质量校验
-    services/prompts.py    翻译/总结/术语/问答提示词模板（本地与云端两套约束）
-    services/translate.py  翻译流水线（分块→保护→模型→修复→校验→缓存）
-    services/summary.py    结构化要点 + BM25 检索的带出处问答
-    main.py                FastAPI 路由 + 任务队列 + 本地推理串行锁 + SPA 托管
+    config.py             environment variables and runtime-tunable settings
+    schemas.py            document IR / API contract (mirrors frontend types.ts)
+    db.py                 SQLite: documents/blocks/translations/glossary/notes/summaries/usage
+    parsing/pdf_parser.py PDF → IR: layout, reading order, figure cropping, table rebuild, self-check
+    providers/__init__.py dual-channel abstraction: Ollama (local) / OpenAI-compatible (cloud) / off
+    services/protect.py   placeholder protection and quality validation
+    services/prompts.py   prompt templates for translation/summary/glossary/Q&A (two sets of constraints)
+    services/translate.py translation pipeline (chunk → protect → model → repair → validate → cache)
+    services/summary.py   structured key points + grounded Q&A over BM25 retrieval
+    main.py               FastAPI routes + task queue + local-inference lock + SPA hosting
   tests/
-    smoke.py               占位符/切分/JSON 容错单元测试
-    test_parser.py         解析器回归测试（双栏 + 单栏 + 扫描件 + 真实论文）
-    make_sample*.py        自动生成测试用 PDF（无版权内容；样本 PDF 不入库，跑测试时自动生成）
+    smoke.py              unit tests: placeholder protection, chunking, JSON tolerance
+    test_parser.py        parser regression (two-column + single-column + scanned + real paper)
+    make_sample*.py       generate the synthetic test PDFs (no copyrighted content; generated at test time)
 frontend/
-  src/styles.css         设计 token（米白/淡黄/深灰褐，含夜间模式）
-  src/store.ts           Zustand 状态与所有业务动作
-  src/api/               类型化 API 客户端
+  src/styles.css         design tokens (cream/pale yellow/dark warm grey, includes dark mode)
+  src/store.ts           Zustand state and all business actions
+  src/api/               typed API client
   src/components/        TopBar / Sidebar / ReadingPane / BlockView / PdfPane / Dock / SettingsPanel …
-  src/views/             Library（文献库）/ DocumentView
-scripts/setup.ps1        首次安装依赖并构建（运行应用请用根目录的 start.ps1 / 启动文献阅读器.cmd）
-.env.example             全部可配置项与说明
+  src/views/             Library / DocumentView
+scripts/setup.ps1        first-time dependency install and build (run the app via start.ps1)
+.env.example             every configurable setting with comments
+README.md / README.zh-CN.md   English / Chinese docs (GitHub shows this file)
+images/                  README screenshots
 ```
 
-数据目录 `backend/data/`（文献、译文、图表、SQLite）不入版本库，删除它等于清空文献库。
+The data directory `backend/data/` (papers, translations, figures, SQLite) is not committed; deleting it clears your library.
 
 ---
 
-## 接口一览
+## API overview
 
-| 方法 | 路径 | 说明 |
+| Method | Path | Purpose |
 | --- | --- | --- |
-| GET | `/api/health` `/api/environment` `/api/providers` | 健康检查、网络与通道状态 |
-| GET/POST | `/api/documents` | 列出 / 上传解析（同文件哈希自动复用） |
-| GET | `/api/documents/{id}` `/blocks` `/file` `/export` | 文档、块、原始 PDF、Markdown 导出 |
-| DELETE | `/api/documents/{id}` | 删除文献及其译文、笔记、图表 |
-| POST | `/api/translate` `/api/translate/estimate` | 启动翻译任务 / 预估 token 与费用 |
-| POST/GET | `/api/summary` `/api/summary/{id}` | 生成 / 读取结构化要点 |
-| POST | `/api/ask` | 带出处的问答（BM25 检索 + 引用 block id） |
-| GET/POST/DELETE | `/api/notes` `/api/glossary` | 笔记与术语表 |
-| GET/PUT | `/api/settings` `/api/usage` | 设置与用量（用量只统计，不上报） |
-| POST | `/api/models/pull` | 应用内下载 Ollama 模型（SSE 进度） |
-| GET | `/api/tasks/{id}` | 任务进度 |
+| GET | `/api/health` `/api/environment` `/api/providers` | health, network and channel status |
+| GET/POST | `/api/documents` | list / upload and parse (same file hash is reused) |
+| GET | `/api/documents/{id}` `/blocks` `/file` `/export` | document, blocks, original PDF, Markdown export |
+| DELETE | `/api/documents/{id}` | delete a paper with its translations, notes and figures |
+| POST | `/api/translate` `/api/translate/estimate` | start a translation task / estimate tokens and cost |
+| POST/GET | `/api/summary` `/api/summary/{id}` | generate / read the structured summary |
+| POST | `/api/ask` | grounded Q&A (BM25 retrieval + cited block ids) |
+| GET/POST/DELETE | `/api/notes` `/api/glossary` | notes and glossary |
+| GET/PUT | `/api/settings` `/api/usage` | settings and usage counters (counted locally, never reported) |
+| POST | `/api/models/pull` | download an Ollama model from inside the app (SSE progress) |
+| GET | `/api/tasks/{id}` | task progress |
 
-交互式文档：启动后访问 `/docs`。
+Interactive docs: `/docs` once the server is running.
 
 ---
 
-## 离线能力矩阵
+## Offline capability matrix
 
-| 功能 | 断网可用性 |
+| Feature | Offline availability |
 | --- | --- |
-| 上传、解析、版面重建、图表裁切、表格还原 | ✅ 完全离线 |
-| 扫描件 OCR（RapidOCR / ONNX，CPU） | ✅ 完全离线（模型随依赖安装，不联网下载） |
-| 阅读、缩放、目录、搜索、阅读进度 | ✅ 完全离线 |
-| 段落对齐、高亮笔记、Markdown 导出 | ✅ 完全离线 |
-| 翻译 / 总结 / 问答（本地模型） | ✅ 需模型权重已下载（仅下载那一次联网） |
-| 翻译 / 总结 / 问答（云端） | ❌ 需网络，不可用时置灰并说明原因 |
-| 首次下载本地模型 | ❌ 唯一需要联网的环节（支持离线导入模型包） |
+| Upload, parsing, layout rebuild, figure cropping, table rebuild | ✅ fully offline |
+| Scanned-page OCR (RapidOCR / ONNX, CPU) | ✅ fully offline (models ship with the dependency, nothing is downloaded) |
+| Reading, zoom, outline, search, reading progress | ✅ fully offline |
+| Paragraph alignment, highlighted notes, Markdown export | ✅ fully offline |
+| Translation / summary / Q&A (local model) | ✅ needs the model weights downloaded once |
+| Translation / summary / Q&A (cloud) | ❌ needs network; greyed out with the reason when unavailable |
+| Downloading a local model for the first time | ❌ the only step that requires the internet (offline model import is supported) |
 
 ---
 
-## 测试
+## Tests
 
 ```powershell
 $env:PYTHONPATH = "$PWD\backend"
-python backend\tests\smoke.py         # 占位符保护 / 切分 / JSON 容错
-python backend\tests\test_parser.py   # 合成样本 + 真实论文的解析回归
+python backend\tests\smoke.py         # placeholder protection / chunking / JSON tolerance
+python backend\tests\test_parser.py   # parser regression: synthetic samples + a real paper
 ```
 
-`test_parser.py` 覆盖四组：双栏带图表表格、单栏论文体、扫描件 OCR、以及一篇**真实的 17 页 MDPI 论文**
-（`backend/tests/samples/real_world_3dphenomvs.pdf`，仅作解析测试用）。前两组与扫描件由
-`make_sample*.py` 自动生成，仓库不需要额外二进制样本。
+`test_parser.py` covers four groups: a two-column paper with figures and a table, a single-column
+paper, a scanned page going through OCR, and a **real 17-page MDPI paper**
+(`backend/tests/samples/real_world_3dphenomvs.pdf`, used only for parsing tests). The first two and
+the scanned page are generated by `make_sample*.py`, so the repository needs no extra binary fixtures.
 
-测试全程只写临时目录（`ESSAY_DATA_DIR` 与合成样本都指向系统临时目录，退出时清理），
-因此跑测试不会往 `backend/data`（你的文献库）或 `backend/tests/samples` 里留下任何文件。
+Tests write only to temporary directories (`ESSAY_DATA_DIR` and the synthetic samples both point at
+the system temp directory and are cleaned up on exit), so a test run leaves nothing behind in
+`backend/data` (your library) or `backend/tests/samples`.
 
-> 仓库里唯一的二进制测试样本 `backend/tests/samples/real_world_3dphenomvs.pdf` 是 MDPI 期刊
-> *Agronomy* 2022, 12, 1865 的开放获取论文（CC BY 4.0，作者 Yinghua Wang 等，DOI 见论文首页），
-> 仅作为真实排版回归用例原样收录，未作任何修改；版权归原作者，按 CC BY 4.0 再分发。
+> The only binary fixture in the repository, `backend/tests/samples/real_world_3dphenomvs.pdf`, is an
+> open-access paper from the MDPI journal *Agronomy* 2022, 12, 1865 (CC BY 4.0, by Yinghua Wang et al.;
+> DOI on the first page). It is included unmodified as a real-layout regression case; copyright stays
+> with the authors and it is redistributed under CC BY 4.0.
 
-真实论文那组断言的是曾经真实出过的问题（详见 `IMPROVEMENT_PROMPT.md`）：
+The real-paper group asserts bugs that actually happened (see `IMPROVEMENT_PROMPT.md`):
 
-- 第 5 页块数 ≤ 12（曾碎成 37 块、每行一块）、段落中位长度 ≥ 60 字符；
-- 跨块句子完整（重新分块不丢字，全篇覆盖率 ≥ 99%）；
-- 目录里没有 `N of M` 跑头（曾混入 16 条）、没有 `0.x` 测量值、没有品牌碎词（`agronomy` / `Winter` / `Heliyon`）；
-- 目录包含 `1. Introduction` / `2. Materials and Methods` / `3. Results`；
-- 前沿信息栏（`Citation:` / `Received:` / `Keywords:`）被识别为独立 `meta` 类型，不与正文混排；
-- 页中重复的期刊名被移出正文流，引文栏碎片不再打断正文句子；
-- 无框线（仅横线）的两列表格被还原为 17 行结构化数据；
-- 乱序的显示公式被截取为图片而不是当作乱码文本；
-- 数字开头的章节（`2.8. 3D Point Cloud…`）进入目录；
-- 块 ID 全局唯一、每页都有块（曾因 ID 跨页重复而只入库最后一页）；
-- **两段被并成一块**：首行缩进的行即使行距与正文完全相同也另起段落（早期只按行距断段，缩进的第一行会被吞进上一段）；
-- **一段被分页拆成两块**：页末以残缺句收尾时，与下一页开头重新接回同一块（要求下一页首行非缩进、不是页眉、行宽足够），接续后不产生重复文本，全篇页末不再有断句残留。
+- page 5 has ≤12 blocks (it once shattered into 37, one per line) and a median paragraph length ≥60 characters;
+- sentences spanning block boundaries stay intact (re-blocking loses no text; coverage ≥99% overall);
+- the outline contains no `N of M` running heads (16 once leaked in), no `0.x` measurement values, no brand fragments (`agronomy` / `Winter` / `Heliyon`);
+- the outline contains `1. Introduction` / `2. Materials and Methods` / `3. Results`;
+- the front-matter rail (`Citation:` / `Received:` / `Keywords:`) becomes a distinct `meta` type instead of mixing into the body;
+- repeated journal names are moved out of the body flow and citation-rail fragments no longer break body sentences;
+- a borderless (rules-only) two-column table is rebuilt as 17 structured rows;
+- scrambled display equations are cropped as images rather than pasted as garbage text;
+- sections starting with a digit (`2.8. 3D Point Cloud…`) reach the outline;
+- block ids are globally unique and every page has blocks (per-page ids once collapsed a 21-page paper into 45 blocks);
+- **two paragraphs merged into one block**: a first-line indent starts a new paragraph even when the leading is uniform (early versions broke paragraphs on line spacing alone, so an indented first line was swallowed by the previous paragraph);
+- **one paragraph split by a page break**: a page ending mid-sentence is rejoined with the start of the next page (the next line must be unindented, not a running head, and wide enough); the join produces no duplicated text, and no page ends mid-sentence any more.
 
-已用真实文献验证过的解析结果（公开论文，只读复制、未改动原文件）：
+Parser results measured on real papers (public papers, read-only copies, originals untouched):
 
-| 文档 | 页数 | 版面 | 块数 / 覆盖页 | 图 | 表 | 目录条目 | meta |
+| Paper | Pages | Layout | Blocks / pages | Figures | Tables | Outline entries | meta |
 | --- | --- | --- | --- | --- | --- | --- | --- |
-| MDPI 番茄生长监测 | 21 | 单栏 | 307 / 21 | 13 | 0 | 25 | 10 |
-| Frontiers 3D 数据增强 | 17 | 双栏 | 333 / 17 | 14 | 1 | 29 | 3 |
-| Heliyon 产量估计 | 21 | 单栏 | 332 / 21 | 11 | 0 | 24 | 2 |
-| MDPI 3DPhenoMVS | 17 | 单栏 | 181 / 17 | 6 | 1 | 25 | 17 |
+| MDPI tomato growth monitoring | 21 | single | 307 / 21 | 13 | 0 | 25 | 10 |
+| Frontiers 3D data augmentation | 17 | double | 333 / 17 | 14 | 1 | 29 | 3 |
+| Heliyon yield estimation | 21 | single | 332 / 21 | 11 | 0 | 24 | 2 |
+| MDPI 3DPhenoMVS | 17 | single | 181 / 17 | 6 | 1 | 25 | 17 |
 
-> 表中的块数会随解析规则改进而变化；「MDPI 3DPhenoMVS」一行是**当前版本**的实测值
-> （181 块 / 110 段，17 页，无框线表格还原为 17 行）。
+> Block counts move as the parsing rules improve; the "MDPI 3DPhenoMVS" row reflects the **current**
+> version (181 blocks / 110 paragraphs, 17 pages, the borderless table rebuilt as 17 rows).
 
-前端类型检查与构建：
+Frontend type check and build:
 
 ```powershell
 cd frontend; npx tsc --noEmit; npm run build
@@ -249,14 +265,14 @@ cd frontend; npx tsc --noEmit; npm run build
 
 ---
 
-## 已知限制
+## Known limitations
 
-- OCR 是识别重建：标点、连字符与个别字符可能与原页面不一致（实测 200 DPI 下置信度约 0.98），关键数字请对照「原版页」核对。整页旋转/倾斜的扫描件未做纠偏，识别率会下降。
-- 表格还原依赖 PyMuPDF 的表格检测；无框线的两列表格有专门兜底（按行分组 + 列对齐），但结构更复杂（合并单元格、嵌套表头）的无框线表格仍可能还原不全，建议切「原版页」对照。
-- `pymupdf_layout` 未启用；版面判定为规则实现，对极端三栏或杂志式混排可能需要人工核对。
-- 标题与目录净化是**规则 + 字号的启发式**：极端版式（例如刊名与标题同字号且紧邻）仍可能多出一条或漏掉一条目录项；发现后可在「解析质量」面板核对原始页面。OCR 页不提供字号信息，因此这些判据在扫描件上会退化为纯文本规则。
-- 论文的**图标式期刊页眉**依赖 span 颜色识别（白字色带可识别，深绿等深色刊名依赖字号/规则判据）。PDF 若不提供颜色信息同样会退化。
-- **公式是图片而非 LaTeX**：这样能保证显示与原版面一致且完全离线，但公式内容不参与翻译、也不能被全文搜索命中（原文本仍保留用于检索）。若要 LaTeX，需要接入公式识别模型（如 pix2tex），会带来额外依赖与耗时。
-- 本地 8B 模型的中文语感与长难句处理弱于云端大模型，这是模型能力的差距；术语一致性与数字保真已由术语表 + 占位符 + 质量校验兜底。
-- 首次本地翻译会先把模型加载进显存（约 10~30 秒），后续段落才会快起来。
-- 成本预估是**校准过的近似值**（输入按 700 token/块开销、输出按 1.3 倍估算）。实测一篇 17 页论文：预估输入 27.3k / 输出 17.6k，实际输入 39.1k / 输出 17.5k，实际花费约 ¥0.08（`deepseek-chat` 定价）。
+- OCR is recognition, not extraction: punctuation, hyphenation and individual characters can differ from the page (confidence is about 0.98 at 200 DPI); verify critical numbers against the original page. Pages that are rotated or skewed are not deskewed and will lose accuracy.
+- Table reconstruction relies on PyMuPDF's detector; borderless two-column tables have a dedicated fallback (row grouping + column alignment), but more complex borderless structures (merged cells, nested headers) can still come out incomplete — compare against the original page.
+- `pymupdf_layout` is not enabled; layout analysis is rule-based and may need a manual check on unusual three-column or magazine-style pages.
+- Heading and outline cleanup is a **heuristic over rules and font sizes**: extreme layouts (a journal name at the same size as the title, printed adjacent to it) can still add or drop an outline entry; check the original page in the "Parse quality" panel. OCR pages carry no font-size information, so those criteria degrade to pure text rules on scans.
+- The **icon-style journal masthead** relies on span colours (white text on a colour band is detected; dark-green journal names fall back to size and rule heuristics). PDFs without colour information degrade the same way.
+- **Equations are images, not LaTeX**: this keeps them pixel-accurate and fully offline, but equation content is not translated and is not matched by full-text search (the raw text is still indexed for retrieval). Real LaTeX would require a formula-recognition model such as pix2tex, adding dependencies and latency.
+- A local 8B model is weaker than a large cloud model at Chinese phrasing and long, complex sentences — a genuine capability gap. Terminological consistency and number fidelity are protected by the glossary, placeholders and the quality gate.
+- The first local translation loads the model into VRAM (about 10–30 seconds) before paragraphs start flowing quickly.
+- Cost estimates are a **calibrated approximation** (input assumes 700 tokens of overhead per chunk, output is the token estimate × 1.3). Measured on a 17-page paper: estimated 27.3k input / 17.6k output, actual 39.1k input / 17.5k output, about ¥0.08 at `deepseek-chat` pricing.
