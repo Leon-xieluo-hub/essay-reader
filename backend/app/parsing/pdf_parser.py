@@ -190,6 +190,18 @@ def _looks_like_formula_line(text: str) -> bool:
 _MATH_GLYPH = re.compile(r"[\x00-\x1f\x7f\u2000-\u206f\ue000-\uf8ff]")
 # Two or more measurements in a row: "0.42 cm, 0.98 cm, and 0.56 cm".
 _MEASUREMENT_TAIL = re.compile(r"\d+(?:\.\d+)?\s*[a-zA-Z%]{0,4}\s*[,;].*\d", re.S)
+
+
+def _reads_like_prose(text: str) -> bool:
+    """True for a real sentence, even when it contains a formula fragment.
+
+    "…an R2 of 0.72 and a MAPE of 17.23%…" carries maths characters but is prose:
+    treating it as a display equation loses the text and changes its typeface.
+    """
+    stripped = text.strip()
+    if not stripped or _looks_like_formula_line(stripped):
+        return False
+    return len(re.findall(r"[A-Za-z]{2,}", stripped)) >= 4 and len(stripped) >= 30
 # Words that follow a bare number inside prose metadata ("29 June 2022) and …")
 # and essentially never start a real section title.
 _HEADING_STOPWORDS = {
@@ -321,6 +333,8 @@ class RawLine:
     column: int = 0
     colour: Optional[tuple[float, float, float]] = None
     cells: Optional[list[tuple[float, float, str]]] = None   # geometric cell runs
+    # (text, bold, italic) per span: keeps inline emphasis inside a paragraph
+    runs: list[tuple[str, bool, bool]] = field(default_factory=list)
 
 
 @dataclass
@@ -334,6 +348,11 @@ class RawParagraph:
     latex: Optional[str] = None
     flags: list[str] = field(default_factory=list)
     explicit_bbox: Optional[tuple[float, float, float, float]] = None
+    # True when the last line runs all the way to the column's right edge: the
+    # paragraph was cut by the measure (or by a page break), not finished. Only
+    # meaningful for justified text, where a final line stops short of the edge.
+    tail_full: bool = False
+
 
     @property
     def bbox(self) -> tuple[float, float, float, float]:
@@ -347,7 +366,77 @@ class RawParagraph:
 
     @property
     def text(self) -> str:
-        return _join_lines([ln.text for ln in self.lines])
+        return self._build()[0]
+
+    @property
+    def emphasis(self) -> list[tuple[int, int, str]]:
+        """(start, end, style) runs over `text` where the text is bold/italic."""
+        return self._build()[1]
+
+    def _build(self) -> tuple[str, list[tuple[int, int, str]]]:
+        """Join the lines exactly like the old text property, and record emphasis.
+
+        Built in one pass so the emphasis offsets always match the returned text:
+        the same hyphen repair and whitespace collapsing applies to both.
+        """
+        out = ""
+        marks: list[tuple[int, int, str]] = []
+        for line in self.lines:
+            pieces = line.runs or [(line.text, line.bold, False)]
+            parts = _trim_runs(pieces)
+            if not parts:
+                continue
+            if out:
+                if _HYPHEN_END.search(out):
+                    out = _HYPHEN_END.sub(r"\1", out)
+                    if marks and marks[-1][1] > len(out):
+                        start, _end, style = marks[-1]
+                        if start < len(out):
+                            marks[-1] = (start, len(out), style)
+                        else:
+                            marks.pop()
+                else:
+                    out += " "
+            for part, bold, italic in parts:
+                part = _MULTISPACE.sub(" ", part)
+                if not part:
+                    continue
+                style = (
+                    "bold italic" if bold and italic else
+                    "bold" if bold else
+                    "italic" if italic else ""
+                )
+                start = len(out)
+                out += part
+                if style:
+                    if marks and marks[-1][2] == style and marks[-1][1] == start:
+                        marks[-1] = (marks[-1][0], len(out), style)
+                    else:
+                        marks.append((start, len(out), style))
+        lead = len(out) - len(out.lstrip())
+        if lead:
+            marks = [(max(0, s - lead), e - lead, style) for s, e, style in marks if e > lead]
+        out = out.strip()
+        marks = [(s, min(e, len(out)), style) for s, e, style in marks if s < len(out)]
+        return out, marks
+
+
+def _trim_runs(pieces: list[tuple[str, bool, bool]]) -> list[tuple[str, bool, bool]]:
+    """Drop the whitespace a PDF puts around a line, keeping run boundaries."""
+    raw = "".join(piece[0] for piece in pieces)
+    if not raw.strip():
+        return []
+    lead = len(raw) - len(raw.lstrip())
+    end = len(raw.rstrip())
+    out: list[tuple[str, bool, bool]] = []
+    cursor = 0
+    for text, bold, italic in pieces:
+        start = cursor
+        cursor += len(text)
+        low, high = max(start, lead), min(cursor, end)
+        if high > low:
+            out.append((text[low - start : high - start], bold, italic))
+    return out
 
 
 # ------------------------------------------------------------------- layout
@@ -578,56 +667,217 @@ def _ends_mid_sentence(text: str) -> bool:
 
 
 def _join_page_split_paragraphs(blocks: list[Block]) -> None:
-    """Re-unite a paragraph that the page break cut in two.
+    """Re-unite paragraphs that the layout split into two blocks.
 
-    Typography does not change at a page boundary, so the continuation is
-    indistinguishable from a body paragraph by spacing alone; what identifies it
-    is that the previous page's last paragraph ends mid-sentence and the next
-    page's first paragraph starts flush at the body margin (a new paragraph would
-    be indented). Merging keeps the sentence, and therefore the translation,
-    intact.
+    Two independent signals say "this text continues":
+
+    * the block's last line reaches the column's right edge, so the measure cut
+      it (this is the only signal that works in the block-style layouts MDPI,
+      Frontiers and Elsevier use, where no paragraph is indented at all);
+    * the text stops mid-sentence.
+
+    A merge is vetoed when the following block opens a new structural unit — a
+    section heading, a run-in label such as "Stem length:", a caption — or when a
+    figure/table/equation block sits between the two.
     """
-    by_page: dict[int, list[Block]] = {}
-    for block in blocks:
-        by_page.setdefault(block.page, []).append(block)
-
-    page_count = max(by_page) + 1 if by_page else 0
-    for page_index in range(page_count - 1):
-        current = sorted(by_page.get(page_index, []), key=lambda b: b.order)
-        following = sorted(by_page.get(page_index + 1, []), key=lambda b: b.order)
-        # The paragraph a page break cuts in two is the *last* one ending before
-        # the break: a page can hold several sentences that end normally, so scan
-        # the ending blocks rather than insisting the very last one is cut.
-        enders = [b for b in current if b.type == "text"][-3:]
-        starters = [b for b in following if b.type in ("text", "caption", "footnote")][:2]
-        if not enders or not starters:
+    ignorable = {"header", "footer", "meta", "caption"}
+    # Identity, not equality: Block is a pydantic model, so `in` / `remove` would
+    # compare field values and could drop a different block that happens to look
+    # the same (two identical figure labels, for instance).
+    texts = [b for b in sorted(blocks, key=lambda b: b.order) if b.type == "text"]
+    merged = 0
+    for index in range(len(texts) - 1):
+        tail = texts[index]
+        if not any(b is tail for b in blocks):
             continue
-        if not any(_ends_mid_sentence(b.text) for b in enders):
+        if not tail.text.strip():
             continue
-        margin = _column_margin_from_block(following)
-        head = None
-        for candidate in starters:
-            if candidate.bbox.y0 < 80 or (candidate.bbox.x1 - candidate.bbox.x0) < 200:
-                continue                      # running head / journal string
-            if _CONTINUED.search(candidate.text[:40]):
-                head = candidate
+        tail_full = "tail-full" in tail.flags
+        mid_sentence = _ends_mid_sentence(tail.text)
+        if not tail_full and not mid_sentence:
+            continue
+        # Look a few blocks ahead: the next text block is often the running head
+        # (still typed "text" at this point), a figure label or a caption between
+        # the two halves of a paragraph.
+        for head in texts[index + 1 : index + 5]:
+            if not any(b is head for b in blocks) or not head.text.strip():
+                continue
+            if head.page > tail.page + 1:
                 break
-            if margin is not None and candidate.bbox.x0 - margin > 8:
-                continue                      # indented → a genuinely new paragraph
+            low, high = sorted((tail.order, head.order))
+            between = [b for b in blocks if low < b.order < high]
+            blocking = [
+                b
+                for b in between
+                if b.type not in ignorable
+                and not _is_running_head_like(b)
+                and not _is_figure_label(b)
+            ]
+            if blocking:
+                # A float (figure, table, display equation) can be placed
+                # between the two halves of a paragraph a page break cut
+                # apart. When both signals are unmistakable — the line was cut
+                # by the measure and the text resumes mid-sentence — the float
+                # is not a boundary.
+                strong = (
+                    tail_full
+                    and bool(re.match(r"^[a-z(\[]", head.text.lstrip()))
+                    and all(
+                        b.type in {"figure", "table", "formula", "footnote"}
+                        for b in blocking
+                    )
+                )
+                if not strong:
+                    break
+            if head.page == tail.page:
+                if tail.column != head.column:
+                    continue
+                gap = head.bbox.y0 - tail.bbox.y1
+                if gap < -3.0:
+                    continue
+                if gap > max(30.0, tail.size * 2.6):
+                    break
+            elif head.page == tail.page + 1:
+                # A running head is short and pinned to the very top; body text
+                # on the next page can legitimately start just as high, so
+                # length and shape decide, not y alone.
+                if _is_running_head_like(head):
+                    continue
+                if (head.bbox.x1 - head.bbox.x0) < 160:
+                    continue
+                # Column indices are per page: a single-column page and a page
+                # with a metadata rail number the body column differently, so
+                # the left edge of the text is the reliable comparison.
+                if abs(head.bbox.x0 - tail.bbox.x0) > 14.0:
+                    break
+                margin = _column_margin_from_block(
+                    [b for b in blocks if b.page == head.page]
+                )
+                if margin is not None and head.bbox.x0 - margin > 8:
+                    break                 # indented → a genuinely new paragraph
+            else:
+                break
+
+            if _opens_structural_unit(head.text):
+                break
+
+            if mid_sentence and not tail_full and not re.match(r"^[a-z(]", head.text.lstrip()):
+                # an unfinished sentence followed by a capitalised sentence is
+                # ambiguous; require the typographic cut signal for that case
+                break
+
+            tail.text = (tail.text.rstrip() + " " + head.text.lstrip()).strip()
+            if head.caption:
+                tail.caption = ((tail.caption or "") + " " + head.caption).strip()
+            tail.flags = [f for f in tail.flags if f != "tail-full"]
+            if "tail-full" in head.flags:
+                tail.flags.append("tail-full")
+            tail.bbox = BBox(
+                x0=min(tail.bbox.x0, head.bbox.x0),
+                # keep the tail's own vertical extent: the block still starts
+                # on the tail's page, and mixing in the next page's y would
+                # make the original-page highlight point at nothing
+                y0=tail.bbox.y0,
+                x1=max(tail.bbox.x1, head.bbox.x1),
+                y1=tail.bbox.y1,
+            )
+            blocks.remove(head)
+            merged += 1
+            break
+    for index, block in enumerate(sorted(blocks, key=lambda b: b.order)):
+        block.order = index
+    return merged
+
+
+def _join_page_edges(blocks: list[Block]) -> int:
+    """Last resort for page-break continuations that a float blocked.
+
+    Only the very last body block of a page and the very first body block of the
+    next page are considered, and the continuation must start lowercase (or open a
+    bracket) — a fresh paragraph essentially never does. That narrowness is what
+    makes it safe to ignore the figure, table or caption sitting between them.
+    """
+    joined = 0
+    pages = sorted({b.page for b in blocks})
+    for page in pages[:-1]:
+        tail_candidates = sorted(
+            (b for b in blocks if b.page == page and b.type == "text"), key=lambda b: b.order
+        )
+        head_candidates = sorted(
+            (b for b in blocks if b.page == page + 1 and b.type == "text"),
+            key=lambda b: b.order,
+        )
+        if not tail_candidates or not head_candidates:
+            continue
+        tail = tail_candidates[-1]
+        if not ("tail-full" in tail.flags or _ends_mid_sentence(tail.text)):
+            continue
+        head = None
+        for candidate in head_candidates[:3]:
+            if _is_running_head_like(candidate) or _is_figure_label(candidate):
+                continue
+            if not re.match(r"^[a-z(\[]", candidate.text.lstrip()):
+                break
             head = candidate
             break
         if head is None:
             continue
-        tail = next(
-            (b for b in reversed(enders) if _ends_mid_sentence(b.text)),
-            enders[-1],
-        )
+        if abs(head.bbox.x0 - tail.bbox.x0) > 14.0:
+            continue
+        if (head.bbox.x1 - head.bbox.x0) < 160:
+            continue
         tail.text = (tail.text.rstrip() + " " + head.text.lstrip()).strip()
         if head.caption:
             tail.caption = ((tail.caption or "") + " " + head.caption).strip()
+        tail.flags = [f for f in tail.flags if f != "tail-full"]
+        if "tail-full" in head.flags:
+            tail.flags.append("tail-full")
         blocks.remove(head)
+        joined += 1
     for index, block in enumerate(sorted(blocks, key=lambda b: b.order)):
         block.order = index
+    return joined
+
+
+def _is_figure_label(block) -> bool:
+    """A stray "(a)" / "A B" block: a figure panel label, not a paragraph."""
+    text = block.text.strip()
+    if not text or len(text) > 28:
+        return False
+    if re.fullmatch(r"[\(\[]?[A-Za-z0-9]{1,3}[\)\].]?", text):
+        return True
+    words = text.split()
+    return len(words) <= 4 and not re.search(r"[.!?;:]", text) and len(text) <= 24
+
+
+def _is_running_head_like(block) -> bool:
+    """A short line pinned to the top of a page: journal name, folio, credit."""
+    text = block.text.strip()
+    if not text or len(text) > 90:
+        return False
+    if _PAGE_NUMBER.match(text) or _FOLIO_ONLY.match(text):
+        return True
+    # A continuation line starts lowercase (or opens a bracket); a running head
+    # never does, so this keeps real body text at the top of a page.
+    if re.match(r"^[a-z(\[]", text):
+        return False
+    return block.bbox.y1 <= 90.0
+
+
+def _opens_structural_unit(text: str) -> bool:
+    """True when a block starts something new rather than continuing prose."""
+    stripped = text.lstrip()
+    if not stripped:
+        return True
+    if _looks_like_section_heading(stripped):
+        return True
+    if _CAPTION_START.match(stripped):
+        return True
+    return bool(_RUN_IN_LABEL.match(stripped))
+
+
+# "Stem length: Stem length is defined as …" — a labelled paragraph opener
+_RUN_IN_LABEL = re.compile(r"^[A-Z][A-Za-z][A-Za-z0-9 \-/()]{0,30}:")
 
 
 def _column_margin_from_block(blocks: list[Block]) -> Optional[float]:
@@ -796,6 +1046,46 @@ def _table_to_html(rows: list[list[str]]) -> str:
 
 
 # ------------------------------------------------------------------- parser
+
+def _region_without_prose(
+    region: tuple[float, float, float, float],
+    fragments: list[tuple[float, float, float, float, str]],
+) -> Optional[tuple[float, float, float, float]]:
+    """Trim a candidate equation region down to its formula lines.
+
+    Cropping must never cost body text, but a sentence that merely sits inside a
+    dense maths band must not cancel the crop either: the equation is kept and
+    the prose line is dropped from the region. Returns None when no formula
+    fragment remains, or when a sentence would still be inside the trimmed band.
+    """
+    left, top, right, bottom = region
+    inside = [
+        f for f in fragments
+        if f[1] >= top - 3 and f[3] <= bottom + 3 and f[0] >= left - 3 and f[2] <= right + 3
+    ]
+    prose = [f for f in inside if _reads_like_prose(f[4])]
+    if not prose:
+        return region
+    maths = sorted(
+        (f for f in inside if not _reads_like_prose(f[4])), key=lambda f: (f[1], f[0])
+    )
+    runs: list[list[tuple[float, float, float, float, str]]] = []
+    for fragment in maths:
+        if runs and fragment[1] - runs[-1][-1][3] <= 6.0:
+            runs[-1].append(fragment)
+        else:
+            runs.append([fragment])
+    if not runs:
+        return None
+    run = max(runs, key=len)
+    new_top = min(f[1] for f in run)
+    new_bottom = max(f[3] for f in run)
+    if new_bottom - new_top < 4.0 or (right - left) < 30.0:
+        return None
+    if any(new_top - 3 <= p[1] and p[3] <= new_bottom + 3 for p in prose):
+        return None
+    return (left, new_top, right, new_bottom)
+
 
 class PDFParser:
     def __init__(self, path: Path, doc_id: str, ocr: bool = False, force_ocr: bool = False) -> None:
@@ -976,7 +1266,39 @@ class PDFParser:
             table_rects.extend(rule_regions)
 
         if table_rects:
-            lines = [ln for ln in lines if not _inside_any(ln.bbox, table_rects)]
+            # A table may only swallow text it actually reproduces. Rebuilding a
+            # grid is lossy for merged cells, wrapped rows and footnotes, and the
+            # lost lines are invisible once the region is cut out of the body.
+            kept_lines: list[RawLine] = []
+            dropped: dict[int, list[RawLine]] = {}
+            for line in lines:
+                owner = next(
+                    (
+                        i
+                        for i, rect in enumerate(table_rects)
+                        if _inside_any(line.bbox, [rect])
+                    ),
+                    None,
+                )
+                if owner is None:
+                    kept_lines.append(line)
+                else:
+                    dropped.setdefault(owner, []).append(line)
+            survivors: list[RawParagraph] = []
+            for index, para in enumerate(table_paragraphs):
+                inside = dropped.get(index, [])
+                if inside:
+                    cells = re.sub(r"\s+", "", "".join("".join(r) for r in (para.table_rows or [])))
+                    raw = re.sub(r"\s+", "", "".join(line.text for line in inside))
+                    if len(cells) < len(raw) * 0.8:
+                        self.warnings.append(
+                            f"page {page_index + 1}: 表格还原不完整，已保留原始文本以免丢失内容"
+                        )
+                        kept_lines.extend(inside)
+                        continue
+                survivors.append(para)
+            table_paragraphs = survivors
+            lines = kept_lines
 
         boxes = [ln.bbox for ln in lines]
         if boxes:
@@ -1039,7 +1361,14 @@ class PDFParser:
                 stats["figures"] += 1
             if para.kind_hint == "text" and text:
                 stats["paragraphs"] += 1
-                if _FORMULA_HINT.search(text):
+                # A paragraph that merely mentions an equation ("…with R2 = 0.72…")
+                # is prose: retyping it as a formula changes its typeface and drops
+                # it from translation. Only short, maths-dominated blocks qualify.
+                if (
+                    _FORMULA_HINT.search(text)
+                    and len(text) < 220
+                    and not _reads_like_prose(text)
+                ):
                     para.kind_hint = "formula"
                     stats["formulas"] += 1
             bbox = para.bbox if para.lines else (0.0, 0.0, 0.0, 0.0)
@@ -1069,7 +1398,14 @@ class PDFParser:
                     caption=para.caption,
                     table_html=para.table_html,
                     table_rows=para.table_rows,
-                    flags=list(para.flags) + (["faint-text"] if faint else []),
+                    emphasis=[
+                        {"start": start, "end": end, "style": style}
+                        for start, end, style in para.emphasis
+                        if style
+                    ],
+                    flags=list(para.flags)
+                    + (["faint-text"] if faint else [])
+                    + (["tail-full"] if para.tail_full else []),
                 )
             )
 
@@ -1134,11 +1470,39 @@ class PDFParser:
                 bold = "bold" in font or "black" in font
                 colour = self._span_colour(spans)
                 cells = self._span_cells(spans)
+                runs = self._span_runs(spans)
                 lines.append(
-                    RawLine(text, bbox, size, bold, page_index, 0, colour, cells)  # type: ignore[arg-type]
+                    RawLine(text, bbox, size, bold, page_index, 0, colour, cells, runs)  # type: ignore[arg-type]
                 )
         lines.sort(key=lambda ln: (round(ln.bbox[1], 1), ln.bbox[0]))
         return lines
+
+    @staticmethod
+    def _span_runs(spans: list[dict]) -> list[tuple[str, bool, bool]]:
+        """Per-span (text, bold, italic) runs, merged when the style repeats.
+
+        PDFs mark emphasis per span, so this is where "some words in this
+        paragraph are bold" survives; the line-level `bold` flag only says
+        whether a whole line was bold.
+        """
+        runs: list[tuple[str, bool, bool]] = []
+        for span in spans:
+            text = _span_text(span)
+            if not text:
+                continue
+            font = str(span.get("font", "")).lower()
+            flags = int(span.get("flags", 0) or 0)
+            bold = bool(flags & 2 ** 4) or any(
+                token in font for token in ("bold", "black", "semibold", "demi")
+            )
+            italic = bool(flags & 2 ** 1) or any(
+                token in font for token in ("italic", "oblique")
+            )
+            if runs and runs[-1][1] == bold and runs[-1][2] == italic:
+                runs[-1] = (runs[-1][0] + text, bold, italic)
+            else:
+                runs.append((text, bold, italic))
+        return runs
 
     @staticmethod
     def _span_cells(spans: list[dict]) -> list[tuple[float, float, str]]:
@@ -1216,6 +1580,9 @@ class PDFParser:
             heights = [ln.bbox[3] - ln.bbox[1] for ln in group if ln.bbox[3] > ln.bbox[1]]
             typical_height = statistics.median(heights) if heights else 11.0
             step_limit = _line_step_threshold(steps, typical_height)
+            # Right edge of the column: a line that reaches it was broken by the
+            # measure, so its paragraph continues (page break or measure break).
+            column_right = max((ln.bbox[2] for ln in group), default=0.0)
 
             current: list[RawLine] = []
             prev: Optional[RawLine] = None
@@ -1223,7 +1590,13 @@ class PDFParser:
             def flush() -> None:
                 nonlocal current
                 if current:
-                    paragraphs.append(RawParagraph(lines=list(current)))
+                    paragraph = RawParagraph(lines=list(current))
+                    last = current[-1]
+                    span = max(
+                        [last.bbox[2] - ln.bbox[0] for ln in current] + [1.0]
+                    )
+                    paragraph.tail_full = last.bbox[2] >= column_right - max(3.0, 0.015 * span)
+                    paragraphs.append(paragraph)
                     current = []
 
             for line in group:
@@ -1496,6 +1869,19 @@ class PDFParser:
                     top = min(line.bbox[1] for line, _cells in run)
                     right = max(line.bbox[2] for line, _cells in run)
                     bottom = max(line.bbox[3] for line, _cells in run)
+                    # A row whose left cell wraps onto a second line puts its
+                    # right-hand value between the two halves, so baseline
+                    # grouping never sees a pair and the whole row is dropped —
+                    # it then reappears as body text under the table (Table 1 of
+                    # the 3DPhenoMVS paper loses its last row exactly this way).
+                    absorbed, bottom = self._absorb_table_tail(
+                        lines,
+                        run,
+                        bottom,
+                        table_rows,
+                        statistics.median(cells[1][0] for _line, cells in run),
+                    )
+                    table_rows.extend(absorbed)
                     tables.append(
                         RawParagraph(
                             kind_hint="table",
@@ -1510,6 +1896,63 @@ class PDFParser:
                     continue
             index += 1
         return tables, regions
+
+    @staticmethod
+    def _absorb_table_tail(
+        lines: list[RawLine],
+        run: list[tuple[RawLine, list[tuple[float, float, str]]]],
+        bottom: float,
+        existing: list[list[str]],
+        right_x: float,
+    ) -> tuple[list[list[str]], float]:
+        """Rows just below `bottom` that still use the table's own columns.
+
+        Only lines that fit the established two-column shape are absorbed, and if
+        anything else sits in the extended band the extension is abandoned — a
+        paragraph must never be swallowed by a table region.
+        """
+        steps = [run[i + 1][0].bbox[1] - run[i][0].bbox[1] for i in range(len(run) - 1)]
+        pitch = statistics.median(steps) if steps else 12.0
+        candidates = [
+            ln for ln in lines
+            if bottom - 3.0 <= ln.bbox[1] <= bottom + pitch * 2.4 and (ln.bbox[2] - ln.bbox[0]) > 1
+        ]
+        if not candidates:
+            return [], bottom
+        anchors = [ln for ln in candidates if ln.bbox[0] >= right_x - 18.0]
+        if not anchors:
+            return [], bottom
+        absorbed: list[list[str]] = []
+        consumed: set[int] = set()
+        new_bottom = bottom
+        for anchor in sorted(anchors, key=lambda ln: ln.bbox[1]):
+            centre = (anchor.bbox[1] + anchor.bbox[3]) / 2.0
+            left_parts = [
+                ln for ln in candidates
+                if ln is not anchor
+                and ln.bbox[0] < right_x - 18.0
+                and abs((ln.bbox[1] + ln.bbox[3]) / 2.0 - centre) <= pitch * 1.05
+            ]
+            if not left_parts:
+                continue
+            text = " ".join(
+                ln.text.strip()
+                for ln in sorted(left_parts, key=lambda ln: (round(ln.bbox[1], 1), ln.bbox[0]))
+                if ln.text.strip()
+            )
+            if not text:
+                continue
+            absorbed.append([text, anchor.text.strip()])
+            consumed.add(id(anchor))
+            consumed.update(id(ln) for ln in left_parts)
+            new_bottom = max([new_bottom, anchor.bbox[3]] + [ln.bbox[3] for ln in left_parts])
+        if not absorbed:
+            return [], bottom
+        if any(id(ln) not in consumed for ln in candidates):
+            return [], bottom                    # something else lives down there
+        if {row[1] for row in existing} & {row[1] for row in absorbed}:
+            return [], bottom
+        return absorbed, new_bottom + 2.0
 
     # -- equations ----------------------------------------------------------
     def _insert_equations(
@@ -1683,8 +2126,14 @@ class PDFParser:
                     ),
                     None,
                 )
-                if index is None or _looks_like_section_heading(line.text.strip()):
-                    # a heading that merely sits next to an equation stays a heading
+                if (
+                    index is None
+                    or _looks_like_section_heading(line.text.strip())
+                    # A sentence that merely sits inside the equation band is
+                    # body text: it stays in the flow (and out of the crop) even
+                    # when the maths around it is replaced by an image.
+                    or _reads_like_prose(line.text)
+                ):
                     outside.append(line)
                 else:
                     inside.append(line)
@@ -1700,6 +2149,9 @@ class PDFParser:
             if hit_index in used:
                 continue                      # this region already produced a crop
             hit = regions[hit_index]
+            # Trim the crop to the formula rows so the image does not repeat the
+            # prose that shares the band.
+            hit = _region_without_prose(hit, fragments) or hit
             padded = (max(0.0, hit[0] - 8), max(0.0, hit[1] - 6), hit[2] + 10, hit[3] + 6)
             name = f"p{page_index + 1:04d}_eq{len(replacements) + 1:03d}.png"
             rel = _crop_region(page, padded, self.asset_key, name)
@@ -2079,9 +2531,15 @@ class PDFParser:
 
     def _refine(self, blocks: list[Block]) -> None:
         """Second pass needing the whole document: references section + title."""
-        _join_page_split_paragraphs(blocks)
+        # Type the non-body blocks first: the continuation merge below asks
+        # whether a running head sits between two halves, and publishers print
+        # those heads in the middle of the page, where only these two passes
+        # recognise them.
         self._isolate_rail_splinters(blocks)
         self._demote_running_branding(blocks)
+        joined = _join_page_split_paragraphs(blocks) + _join_page_edges(blocks)
+        if joined:
+            self.warnings.append(f"已把被排版切断的 {joined} 段正文接回同一块")
         ref_start: Optional[int] = None
         title_ids: set[str] = set()
         for i, block in enumerate(blocks):

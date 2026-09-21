@@ -254,6 +254,7 @@ def _block_to_out(block, translations: dict, note_counts: dict[str, int]) -> Blo
         table_html=block.table_html,
         table_rows=block.table_rows,
         table_rows_translated=block.table_rows_translated,
+        emphasis=block.emphasis,
         flags=block.flags,
         translations=tr,
         translation_meta=meta,

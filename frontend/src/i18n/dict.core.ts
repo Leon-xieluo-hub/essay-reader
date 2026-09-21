@@ -1,0 +1,113 @@
+/** Core shell strings: app frame, sidebar, reading pane, block rendering. */
+export const CORE_DICT: Record<string, string> = {
+  // App / shell
+  文献阅读器: "Essay Reader",
+  "解析 PDF、双通道翻译、结构化要点与带出处的问答。所有文件与译文都留在本机。":
+    "PDF parsing, dual-channel translation, structured summaries and grounded Q&A. Papers and translations never leave your machine.",
+  离线: "Offline",
+  在线: "Online",
+
+  // Sidebar
+  文献库: "Library",
+  展开侧栏: "Expand sidebar",
+  折叠侧栏: "Collapse sidebar",
+  "还没有文献。": "No papers yet.",
+  "拖入 PDF 或点击上方按钮开始。": "Drop a PDF here or use the button above to start.",
+  "{count} 页": "{count} pages",
+  双栏: "two-column",
+  单栏: "single-column",
+  混排: "mixed",
+  "图 {count}": "{count} figures",
+  "表 {count}": "{count} tables",
+  "删除《{name}》及其译文与笔记？": "Delete “{name}” with its translations and notes?",
+  删除: "Delete",
+  目录: "Outline",
+  点击卡片开始阅读: "Pick a card to start reading",
+
+  // Reading pane
+  文章信息: "Article info",
+  "以下内容来自出版商的元信息栏，不属于正文，因此单独列出":
+    "These lines come from the publisher's metadata rail, not the body text, so they are listed separately",
+  "正在解析或没有可显示的正文…": "Parsing, or there is no body text to show…",
+  "解析结果与原页面可能存在细微差异 —— 如需核对，可切换到「原版页」模式查看原始排版。":
+    "Parsing can differ slightly from the page. Switch to “Original page” to check the original layout.",
+
+  // Top bar — reading modes
+  双语: "Bilingual",
+  译文: "Translation",
+  原文: "Original",
+  原版页: "Original page",
+  原文与译文逐段对照: "Source and translation compared paragraph by paragraph",
+  只看译文: "Translation only",
+  只看提取的原文: "Extracted source text only",
+  "渲染原始 PDF 页面，逐块高亮": "Render the original PDF pages, highlighting block by block",
+
+  // Top bar — target language select
+  目标语言: "Target language",
+  简体中文: "Simplified Chinese",
+  繁體中文: "Traditional Chinese",
+  English: "English",
+  日本語: "Japanese",
+
+  // Top bar — search, page count, export menu
+  "折叠/展开侧栏": "Collapse / expand sidebar",
+  "搜索本文…": "Search this paper…",
+  "{pages} 页 · {authors}": "{pages} pages · {authors}",
+  导出: "Export",
+  "Markdown · 双语对照": "Markdown · bilingual",
+  "Markdown · 仅译文": "Markdown · translation only",
+  "Markdown · 仅原文": "Markdown · source only",
+  "原始 PDF": "Original PDF",
+
+  // Top bar — usage, language toggle, theme, settings, progress
+  "云端累计用量（本地通道不消耗 token）": "Cumulative cloud usage (the local channel spends no tokens)",
+  "云端 {tokens} tok · ¥{cost}": "Cloud {tokens} tok · ¥{cost}",
+  "界面语言 / Interface language": "Interface language",
+  "切换主题（跟随系统 → 浅色 → 深色）": "Switch theme (system → light → dark)",
+  设置: "Settings",
+  "处理中…": "Working…",
+
+  // --- block rendering, task messages, notes ---
+  " · OCR {pages} 页（置信度 {conf}%）": " · OCR {pages} pages (confidence {conf}%)",
+  "AI 功能已关闭：请先启用模型通道": "AI is off: enable a model channel first",
+  "AI 功能已关闭：请先在设置中启用本地模型或配置云端 API": "AI is off: enable the local model or configure the cloud API in settings first",
+  "Essay Reader · 文献阅读器": "Essay Reader",
+  "{label}开始翻译…": "{label} translation started…",
+  "任务失败": "Task failed",
+  "任务完成": "Task finished",
+  "保存": "Save",
+  "公式原图": "Cropped equation",
+  "公式原文（可切原版页核对）": "Raw equation text (check the original page)",
+  "公式按原版面截取（文本层顺序错乱，故不做文字重排）": "Cropped from the page: the text layer order is scrambled, so it is not reflowed",
+  "写点批注…（会保存到本地）": "Write a note… (stored locally)",
+  "出错：{msg}": "Error: {msg}",
+  "原文文本：{text}": "Source text: {text}",
+  "取消": "Cancel",
+  "复用缓存 {count} 段": "{count} from cache",
+  "失败 {count} 段": "{count} failed",
+  "就此提问": "Ask about this",
+  "已保存笔记": "Note saved",
+  "已删除文献及本地缓存": "Paper and local cache deleted",
+  "已抽取 {count} 条术语": "Extracted {count} terms",
+  "已按行列翻译 · 可与原表对照": "Translated row by row · compare with the original table",
+  "已更新：{fields}": "Updated: {fields}",
+  "已翻译 {count} 段": "{count} paragraphs translated",
+  "待复核": "Needs review",
+  "待复核 {count} 段": "{count} need review",
+  "无法连接本地服务：{msg}": "Cannot reach the local service: {msg}",
+  "术语已更新，将应用于后续翻译": "Glossary updated; it applies to later translations",
+  "查看原表（未翻译）": "Show the original table (untranslated)",
+  "翻译失败": "Translation failed",
+  "表格": "Table",
+  "要点总结已生成": "Summary ready",
+  "解析为结构化数据，可横向滚动": "Parsed into structured data; scroll horizontally",
+  "解析完成：{pages} 页 · 质量 {quality} 分{channel} · {ms}ms": "Parsed: {pages} pages · quality {quality}{channel} · {ms}ms",
+  "设置未变化": "No settings changed",
+  "该区域疑似图片但未能裁切，请切换到「原版页」查看": "This region looks like a figure but could not be cropped; open the original page",
+  "质量校验未通过（数字/引用/占位符不一致），建议核对": "Quality check failed (numbers, citations or placeholders differ); please verify",
+  "重译": "Retranslate",
+  "重译此表": "Retranslate this table",
+  "非正文内容（出版商元信息栏）": "Not body text (publisher metadata rail)",
+  "（尚未翻译 · 悬停段落可单段翻译）": "(not translated yet · hover a paragraph to translate it alone)",
+  "（无批注）": "(no note)",
+};

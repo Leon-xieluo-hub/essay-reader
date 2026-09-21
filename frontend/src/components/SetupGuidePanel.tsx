@@ -3,6 +3,7 @@ import { createPortal } from "react-dom";
 
 import { api } from "../api/client";
 import type { ProviderKey, SetupGuide } from "../api/types";
+import { useT } from "../i18n";
 import { useApp } from "../store";
 
 /**
@@ -31,6 +32,7 @@ export function SetupGuidePanel({
   const [progress, setProgress] = useState<{ text: string; percent: number | null } | null>(null);
   const [model, setModel] = useState("");
   const [apiKey, setApiKey] = useState("");
+  const t = useT();
 
   const refresh = useCallback(async () => {
     try {
@@ -49,22 +51,22 @@ export function SetupGuidePanel({
   const pullModel = () => {
     const target = model.trim() || guide?.local.model || "";
     if (!target) {
-      toast("warn", "请填写要下载的模型名，例如 qwen3:8b");
+      toast("warn", t("请填写要下载的模型名，例如 qwen3:8b"));
       return;
     }
     setBusy("pull");
-    setProgress({ text: `正在连接本地推理服务并下载 ${target}…`, percent: 0 });
+    setProgress({ text: t("正在连接本地推理服务并下载 {model}…", { model: target }), percent: 0 });
     api.pullModel(
       target,
       (event) => {
         if (typeof event.error === "string") {
-          setProgress({ text: `下载失败：${event.error}`, percent: null });
+          setProgress({ text: t("下载失败：{error}", { error: event.error }), percent: null });
           return;
         }
         const total = Number(event.total ?? 0);
         const completed = Number(event.completed ?? 0);
         setProgress({
-          text: String(event.status ?? "下载中"),
+          text: String(event.status ?? t("下载中")),
           percent: total > 0 ? Math.round((completed / total) * 100) : null,
         });
       },
@@ -72,7 +74,7 @@ export function SetupGuidePanel({
         setBusy("");
         await refresh();
         setProgress((current) =>
-          current ? { ...current, text: "下载流程结束，可点击「重新检测」确认" } : null,
+          current ? { ...current, text: t("下载流程结束，可点击「重新检测」确认") } : null,
         );
       },
     );
@@ -82,22 +84,25 @@ export function SetupGuidePanel({
     const url = guide?.links.ollama_installer ?? "";
     if (!url) return;
     setBusy("download");
-    setProgress({ text: "正在下载安装包…", percent: 0 });
+    setProgress({ text: t("正在下载安装包…"), percent: 0 });
     api.downloadOllama(
       url,
       (event) => {
         if (typeof event.error === "string") {
-          setProgress({ text: `下载失败：${event.error}`, percent: null });
+          setProgress({ text: t("下载失败：{error}", { error: event.error }), percent: null });
           return;
         }
         if (event.done) {
           setProgress({
-            text: `已保存到 ${String(event.path ?? "")}（${Math.round(Number(event.size ?? 0) / 1048576)} MB）`,
+            text: t("已保存到 {path}（{size} MB）", {
+              path: String(event.path ?? ""),
+              size: Math.round(Number(event.size ?? 0) / 1048576),
+            }),
             percent: 100,
           });
           return;
         }
-        setProgress({ text: "正在下载安装包…", percent: Number(event.percent ?? 0) });
+        setProgress({ text: t("正在下载安装包…"), percent: Number(event.percent ?? 0) });
       },
       () => setBusy(""),
     );
@@ -120,31 +125,32 @@ export function SetupGuidePanel({
         <div className="flex items-start justify-between gap-3 border-b border-line px-5 py-4">
           <div>
             <h2 className="text-base font-semibold">
-              {channel === "cloud" ? "启用云端模型" : "启用本地模型"}
+              {channel === "cloud" ? t("启用云端模型") : t("启用本地模型")}
             </h2>
             <p className="mt-1 text-xs leading-relaxed text-ink-3">
-              翻译、要点与问答需要一条可用的模型通道。下面按依赖顺序给出每一步，
-              完成后可随时回来点「重新检测」。
+              {t(
+                "翻译、要点与问答需要一条可用的模型通道。下面按依赖顺序给出每一步，完成后可随时回来点「重新检测」。",
+              )}
             </p>
           </div>
           <button className="btn shrink-0" onClick={onClose}>
-            关闭
+            {t("关闭")}
           </button>
         </div>
 
         <div className="min-h-0 flex-1 overflow-y-auto px-5 py-4">
-          {!guide && <p className="text-sm text-ink-2">正在检测环境…</p>}
+          {!guide && <p className="text-sm text-ink-2">{t("正在检测环境…")}</p>}
 
           {guide && channel === "local" && local && (
             <ol className="space-y-3 text-sm">
               <Step
                 index={1}
-                title="安装本地推理引擎（Ollama）"
+                title={t("安装本地推理引擎（Ollama）")}
                 state={local.binary_found ? "done" : "todo"}
                 detail={
                   local.binary_found
-                    ? `已检测到：${local.binary_path}`
-                    : "尚未检测到 Ollama。可以一键下载官方安装包，或自行从官网下载。"
+                    ? t("已检测到：{path}", { path: local.binary_path })
+                    : t("尚未检测到 Ollama。可以一键下载官方安装包，或自行从官网下载。")
                 }
               >
                 {!local.binary_found && (
@@ -154,7 +160,7 @@ export function SetupGuidePanel({
                       disabled={busy === "download"}
                       onClick={downloadInstaller}
                     >
-                      {busy === "download" ? "下载中…" : "一键下载安装包"}
+                      {busy === "download" ? t("下载中…") : t("一键下载安装包")}
                     </button>
                     <a
                       className="btn"
@@ -162,10 +168,10 @@ export function SetupGuidePanel({
                       target="_blank"
                       rel="noreferrer"
                     >
-                      打开官网下载页
+                      {t("打开官网下载页")}
                     </a>
                     <span className="text-[11px] text-ink-3">
-                      下载完成后双击安装；静默安装可用
+                      {t("下载完成后双击安装；静默安装可用")}
                       <code className="mx-1 font-mono">{guide.commands.windows_install}</code>
                     </span>
                   </div>
@@ -174,13 +180,16 @@ export function SetupGuidePanel({
 
               <Step
                 index={2}
-                title="启动推理服务"
+                title={t("启动推理服务")}
                 state={local.binary_found ? "todo" : "wait"}
-                detail="安装完成后 Ollama 会常驻后台（托盘图标）。若未启动，运行 `ollama serve`。"
+                detail={t(
+                  "安装完成后 Ollama 会常驻后台（托盘图标）。若未启动，运行 `ollama serve`。",
+                )}
               >
                 <div className="mt-2 flex flex-wrap items-center gap-2 text-[11px] text-ink-3">
                   <span>
-                    当前端点：<code className="font-mono">{local.base_url}</code>
+                    {t("当前端点：")}
+                    <code className="font-mono">{local.base_url}</code>
                   </span>
                   {local.detail && <span className="chip chip-warn">{local.detail}</span>}
                 </div>
@@ -188,16 +197,17 @@ export function SetupGuidePanel({
 
               <Step
                 index={3}
-                title="下载翻译模型"
+                title={t("下载翻译模型")}
                 state={
                   local.installed_models.length ? "done" : local.binary_found ? "todo" : "wait"
                 }
                 detail={
                   local.installed_models.length
-                    ? `已安装 ${local.installed_models.length} 个模型：${local.installed_models
-                        .slice(0, 5)
-                        .join(", ")}`
-                    : "模型权重在应用内下载，全程离线可用；8GB 显存建议 8B 级 Q5/Q6 量化。"
+                    ? t("已安装 {count} 个模型：{models}", {
+                        count: local.installed_models.length,
+                        models: local.installed_models.slice(0, 5).join(", "),
+                      })
+                    : t("模型权重在应用内下载，全程离线可用；8GB 显存建议 8B 级 Q5/Q6 量化。")
                 }
               >
                 <div className="mt-2 flex flex-wrap items-center gap-2">
@@ -208,7 +218,7 @@ export function SetupGuidePanel({
                     onChange={(event) => setModel(event.target.value)}
                   />
                   <button className="btn btn-primary" disabled={busy === "pull"} onClick={pullModel}>
-                    {busy === "pull" ? "下载中…" : "一键下载模型"}
+                    {busy === "pull" ? t("下载中…") : t("一键下载模型")}
                   </button>
                   <a
                     className="btn"
@@ -216,27 +226,28 @@ export function SetupGuidePanel({
                     target="_blank"
                     rel="noreferrer"
                   >
-                    浏览模型库
+                    {t("浏览模型库")}
                   </a>
                 </div>
                 <p className="mt-1 text-[11px] text-ink-3">
-                  命令行方式：<code className="font-mono">{guide.commands.pull_model}</code>
+                  {t("命令行方式：")}
+                  <code className="font-mono">{guide.commands.pull_model}</code>
                 </p>
               </Step>
 
               <Step
                 index={4}
-                title="切换通道并开始翻译"
+                title={t("切换通道并开始翻译")}
                 state={local.available ? "done" : "wait"}
                 detail={
                   local.available
-                    ? "本地通道已就绪：免费、离线、数据不出本机。"
-                    : "三步完成后，本通道会变为可用。"
+                    ? t("本地通道已就绪：免费、离线、数据不出本机。")
+                    : t("三步完成后，本通道会变为可用。")
                 }
               >
                 <div className="mt-2 flex flex-wrap gap-2">
                   <button className="btn" onClick={() => void refresh()}>
-                    重新检测
+                    {t("重新检测")}
                   </button>
                   <button
                     className="btn btn-primary"
@@ -246,7 +257,7 @@ export function SetupGuidePanel({
                       onClose();
                     }}
                   >
-                    切换到本地模型
+                    {t("切换到本地模型")}
                   </button>
                 </div>
               </Step>
@@ -256,15 +267,16 @@ export function SetupGuidePanel({
           {guide && channel === "cloud" && cloud && (
             <div className="space-y-3 text-sm">
               <p className="text-xs leading-relaxed text-ink-3">
-                云端通道兼容任何 OpenAI 格式接口（DeepSeek、OpenAI、自建中转均可）。
-                密钥只保存在本机后端，界面不会回显，也不会写入仓库。
+                {t(
+                  "云端通道兼容任何 OpenAI 格式接口（DeepSeek、OpenAI、自建中转均可）。密钥只保存在本机后端，界面不会回显，也不会写入仓库。",
+                )}
               </p>
               <label className="block text-xs text-ink-2">
                 Base URL
                 <input className="input mt-1" defaultValue={cloud.base_url} id="cloud-base-url" />
               </label>
               <label className="block text-xs text-ink-2">
-                API Key {cloud.api_key_set && <span className="chip chip-ok ml-1">已配置</span>}
+                API Key {cloud.api_key_set && <span className="chip chip-ok ml-1">{t("已配置")}</span>}
                 <input
                   className="input mt-1"
                   type="password"
@@ -288,10 +300,10 @@ export function SetupGuidePanel({
                     await refresh();
                   }}
                 >
-                  保存并检测
+                  {t("保存并检测")}
                 </button>
                 <a className="btn" href={guide.links.deepseek_keys} target="_blank" rel="noreferrer">
-                  获取 DeepSeek Key
+                  {t("获取 DeepSeek Key")}
                 </a>
                 <a
                   className="btn"
@@ -299,15 +311,16 @@ export function SetupGuidePanel({
                   target="_blank"
                   rel="noreferrer"
                 >
-                  接口文档
+                  {t("接口文档")}
                 </a>
                 <button className="btn" onClick={() => void refresh()}>
-                  重新检测
+                  {t("重新检测")}
                 </button>
               </div>
               <p className="text-[11px] text-ink-3">
-                当前模型：<code className="font-mono">{cloud.model}</code> ·{" "}
-                {settings?.cloud_api_key_set ? "已保存密钥" : "尚未保存密钥"} · {cloud.detail}
+                {t("当前模型：")}
+                <code className="font-mono">{cloud.model}</code> ·{" "}
+                {settings?.cloud_api_key_set ? t("已保存密钥") : t("尚未保存密钥")} · {cloud.detail}
               </p>
             </div>
           )}
@@ -330,8 +343,9 @@ export function SetupGuidePanel({
 
         <div className="border-t border-line px-5 py-3">
           <p className="text-[11px] leading-relaxed text-ink-3">
-            提示：解析、阅读、搜索、笔记、图表始终离线可用，不需要任何模型通道；
-            只有翻译、要点总结与问答需要模型。
+            {t(
+              "提示：解析、阅读、搜索、笔记、图表始终离线可用，不需要任何模型通道；只有翻译、要点总结与问答需要模型。",
+            )}
           </p>
         </div>
       </div>
@@ -353,8 +367,10 @@ function Step({
   state: "done" | "todo" | "wait";
   children?: React.ReactNode;
 }) {
+  const t = useT();
   const badge = state === "done" ? "chip-ok" : state === "todo" ? "chip-warn" : "";
-  const label = state === "done" ? "已完成" : state === "todo" ? "待完成" : "等待前置步骤";
+  const label =
+    state === "done" ? t("已完成") : state === "todo" ? t("待完成") : t("等待前置步骤");
   return (
     <li className="rounded-xl border border-line bg-paper-2/60 p-3">
       <div className="flex items-center gap-2">

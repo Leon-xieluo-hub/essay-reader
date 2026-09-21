@@ -38,6 +38,14 @@ class BBox(BaseModel):
         return [self.x0, self.y0, self.x1, self.y1]
 
 
+class EmphasisRun(BaseModel):
+    """A bold/italic stretch of a block's text (character offsets into `text`)."""
+
+    start: int
+    end: int
+    style: str                            # "bold" | "italic" | "bold italic"
+
+
 class Block(BaseModel):
     id: str
     doc_id: str
@@ -58,6 +66,8 @@ class Block(BaseModel):
     table_html: Optional[str] = None
     table_rows: Optional[list[list[str]]] = None
     table_rows_translated: Optional[list[list[str]]] = None
+    # inline styling kept from the PDF (bold/italic words inside a paragraph)
+    emphasis: list[EmphasisRun] = Field(default_factory=list)
     # quality flags raised by the parser
     flags: list[str] = Field(default_factory=list)
 
@@ -137,6 +147,7 @@ class BlockOut(BaseModel):
     table_html: Optional[str] = None
     table_rows: Optional[list[list[str]]] = None
     table_rows_translated: Optional[list[list[str]]] = None
+    emphasis: list[EmphasisRun] = Field(default_factory=list)
     flags: list[str] = Field(default_factory=list)
     translations: dict[str, str] = Field(default_factory=dict)
     translation_meta: dict[str, TranslationMeta] = Field(default_factory=dict)

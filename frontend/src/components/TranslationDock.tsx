@@ -3,6 +3,7 @@ import ReactMarkdown from "react-markdown";
 import remarkGfm from "remark-gfm";
 
 import type { DocBlock } from "../api/types";
+import { useT } from "../i18n";
 import { useApp } from "../store";
 
 const TABS = [
@@ -18,11 +19,12 @@ export function Dock() {
   const tab = useApp((s) => s.dockTab);
   const setDockTab = useApp((s) => s.setDockTab);
   const toggleDock = useApp((s) => s.toggleDock);
+  const t = useT();
 
   if (!open) {
     return (
       <div className="flex w-9 shrink-0 flex-col items-center gap-2 border-l border-line bg-paper-2/60 py-3">
-        <button className="btn btn-ghost !px-1.5" onClick={() => toggleDock()} title="展开侧面板">
+        <button className="btn btn-ghost !px-1.5" onClick={() => toggleDock()} title={t("展开侧面板")}>
           ‹
         </button>
       </div>
@@ -39,10 +41,10 @@ export function Dock() {
             data-active={tab === item.key}
             onClick={() => setDockTab(item.key)}
           >
-            {item.label}
+            {t(item.label)}
           </button>
         ))}
-        <button className="btn btn-ghost ml-auto !px-1.5" onClick={() => toggleDock()} title="收起">
+        <button className="btn btn-ghost ml-auto !px-1.5" onClick={() => toggleDock()} title={t("收起")}>
           ›
         </button>
       </div>
@@ -63,19 +65,22 @@ function SummaryTab() {
   const task = useApp((s) => s.task);
   const provider = useApp((s) => s.provider);
   const busy = task?.status === "running" && task.kind === "summary";
+  const t = useT();
 
   return (
     <div className="text-sm">
       <div className="mb-3 flex flex-wrap items-center gap-2">
         <button className="btn btn-primary" disabled={provider === "off" || busy} onClick={() => void runSummary(false)}>
-          {busy ? "生成中…" : summary ? "重新生成要点" : "生成结构化要点"}
+          {busy ? t("生成中…") : summary ? t("重新生成要点") : t("生成结构化要点")}
         </button>
-        {provider === "cloud" && <span className="chip chip-warn">云端 · 按 token 计费</span>}
-        {provider === "local" && <span className="chip chip-ok">本地 · 免费离线</span>}
+        {provider === "cloud" && <span className="chip chip-warn">{t("云端 · 按 token 计费")}</span>}
+        {provider === "local" && <span className="chip chip-ok">{t("本地 · 免费离线")}</span>}
       </div>
       {provider === "off" && (
         <p className="mb-3 rounded-xl border border-line bg-surface p-2 text-xs leading-relaxed text-ink-2">
-          AI 功能已关闭（纯阅读模式）。在顶栏的通道菜单或设置里启用本地/云端模型后即可生成要点。
+          {t(
+            "AI 功能已关闭（纯阅读模式）。在顶栏的通道菜单或设置里启用本地/云端模型后即可生成要点。",
+          )}
         </p>
       )}
       {summary ? (
@@ -84,8 +89,9 @@ function SummaryTab() {
         </div>
       ) : (
         <p className="text-xs leading-relaxed text-ink-3">
-          生成后会得到：研究问题 / 方法与技术路线 / 数据与实验设置 / 主要结论 / 创新点 / 局限 / 关键数据 / 可复用之处，
-          每个结论尽量带具体数字。可导出为 Markdown。
+          {t(
+            "生成后会得到：研究问题 / 方法与技术路线 / 数据与实验设置 / 主要结论 / 创新点 / 局限 / 关键数据 / 可复用之处， 每个结论尽量带具体数字。可导出为 Markdown。",
+          )}
         </p>
       )}
     </div>
@@ -101,6 +107,7 @@ function ChatTab() {
   const setActiveBlock = useApp((s) => s.setActiveBlock);
   const [question, setQuestion] = useState("");
   const [useSelection, setUseSelection] = useState(true);
+  const t = useT();
 
   const send = () => {
     if (!question.trim()) return;
@@ -113,8 +120,9 @@ function ChatTab() {
       <div className="min-h-0 flex-1 space-y-3 overflow-y-auto">
         {chat.length === 0 && (
           <p className="text-xs leading-relaxed text-ink-3">
-            基于本文内容作答，并给出处（段落 + 页码）；文中没有依据时会明确说明「文中未提及」。
-            点击任意段落后再提问，会优先以该段落为依据。
+            {t(
+              "基于本文内容作答，并给出处（段落 + 页码）；文中没有依据时会明确说明「文中未提及」。 点击任意段落后再提问，会优先以该段落为依据。",
+            )}
           </p>
         )}
         {chat.map((message, index) => (
@@ -125,9 +133,9 @@ function ChatTab() {
             }`}
           >
             <div className="mb-1 text-[11px] text-ink-3">
-              {message.role === "user" ? "我" : "助手"}
+              {message.role === "user" ? t("我") : t("助手")}
               {message.role === "assistant" && message.grounded === false && (
-                <span className="chip chip-warn ml-1">文中未提及</span>
+                <span className="chip chip-warn ml-1">{t("文中未提及")}</span>
               )}
             </div>
             <div className="whitespace-pre-wrap">{message.text}</div>
@@ -139,7 +147,8 @@ function ChatTab() {
                     className="block w-full rounded-lg border border-line bg-surface/70 p-1.5 text-left text-[11px] hover:bg-accent-soft"
                     onClick={() => setActiveBlock(item.block_id)}
                   >
-                    <span className="text-ink-3">第 {item.page + 1} 页 ·</span> {item.quote}
+                    <span className="text-ink-3">{t("第 {page} 页", { page: item.page + 1 })} ·</span>{" "}
+                    {item.quote}
                   </button>
                 ))}
               </div>
@@ -156,12 +165,12 @@ function ChatTab() {
             disabled={!activeBlockId}
             onChange={(event) => setUseSelection(event.target.checked)}
           />
-          {activeBlockId ? "优先依据当前选中段落" : "先在正文中点选一段可限定依据"}
+          {activeBlockId ? t("优先依据当前选中段落") : t("先在正文中点选一段可限定依据")}
         </label>
         <textarea
           className="textarea"
           rows={2}
-          placeholder="例如：这篇论文的核心创新点是什么？"
+          placeholder={t("例如：这篇论文的核心创新点是什么？")}
           value={question}
           onChange={(event) => setQuestion(event.target.value)}
           onKeyDown={(event) => {
@@ -170,14 +179,18 @@ function ChatTab() {
         />
         <div className="mt-1 flex items-center justify-between">
           <span className="text-[11px] text-ink-3">
-            {provider === "off" ? "AI 已关闭" : provider === "local" ? "本地模型 · 免费离线" : "云端模型 · 按量计费"}
+            {provider === "off"
+              ? t("AI 已关闭")
+              : provider === "local"
+                ? t("本地模型 · 免费离线")
+                : t("云端模型 · 按量计费")}
           </span>
           <div className="flex gap-1">
             <button className="btn" onClick={clearChat}>
-              清空
+              {t("清空")}
             </button>
             <button className="btn btn-primary" disabled={provider === "off"} onClick={send}>
-              提问
+              {t("提问")}
             </button>
           </div>
         </div>
@@ -192,32 +205,33 @@ function NotesTab() {
   const setActiveBlock = useApp((s) => s.setActiveBlock);
   const lang = useApp((s) => s.lang);
   const doc = useApp((s) => s.doc);
+  const t = useT();
 
   return (
     <div className="space-y-2 text-sm">
       <div className="flex items-center justify-between">
-        <span className="text-xs text-ink-3">共 {notes.length} 条（保存在本地）</span>
+        <span className="text-xs text-ink-3">{t("共 {count} 条（保存在本地）", { count: notes.length })}</span>
         {doc && (
           <a className="btn" href={`/api/documents/${doc.id}/export?lang=${lang}&mode=bilingual`}>
-            导出含笔记
+            {t("导出含笔记")}
           </a>
         )}
       </div>
       {notes.length === 0 && (
         <p className="text-xs leading-relaxed text-ink-3">
-          悬停任意段落点击「笔记」即可添加批注；笔记会随 Markdown 一起导出。
+          {t("悬停任意段落点击「笔记」即可添加批注；笔记会随 Markdown 一起导出。")}
         </p>
       )}
       {notes.map((note) => (
         <div key={note.id} className="rounded-xl border border-line bg-surface p-2">
           <button className="w-full text-left text-[11px] text-ink-3" onClick={() => setActiveBlock(note.block_id)}>
-            跳到该段落
+            {t("跳到该段落")}
           </button>
           <div className="mt-1 whitespace-pre-wrap">{note.comment}</div>
           <div className="mt-1 border-l-2 border-accent-strong pl-2 text-[11px] text-ink-3">{note.quote}</div>
           <div className="mt-1 flex justify-end">
             <button className="btn btn-ghost !px-1.5 !py-0.5 !text-[11px] text-danger" onClick={() => void removeNote(note.id)}>
-              删除
+              {t("删除")}
             </button>
           </div>
         </div>
@@ -235,11 +249,12 @@ function GlossaryTab() {
   const [source, setSource] = useState("");
   const [target, setTarget] = useState("");
   const [busy, setBusy] = useState(false);
+  const t = useT();
 
   return (
     <div className="space-y-2 text-sm">
       <p className="text-xs leading-relaxed text-ink-3">
-        术语表决定全文译法一致性，翻译时会强制注入。修改后对新翻译立即生效，也可对个别段落点「重译」。
+        {t("术语表决定全文译法一致性，翻译时会强制注入。修改后对新翻译立即生效，也可对个别段落点「重译」。")}
       </p>
       <div className="flex gap-1">
         <button
@@ -250,13 +265,23 @@ function GlossaryTab() {
             void buildGlossary().finally(() => setBusy(false));
           }}
         >
-          {busy ? "抽取中…" : "自动抽取术语"}
+          {busy ? t("抽取中…") : t("自动抽取术语")}
         </button>
-        <span className="chip">{glossary.length} 条</span>
+        <span className="chip">{t("{count} 条", { count: glossary.length })}</span>
       </div>
       <div className="grid grid-cols-[1fr_1fr_auto] gap-1">
-        <input className="input" placeholder="原文术语" value={source} onChange={(e) => setSource(e.target.value)} />
-        <input className="input" placeholder="译法" value={target} onChange={(e) => setTarget(e.target.value)} />
+        <input
+          className="input"
+          placeholder={t("原文术语")}
+          value={source}
+          onChange={(e) => setSource(e.target.value)}
+        />
+        <input
+          className="input"
+          placeholder={t("译法")}
+          value={target}
+          onChange={(e) => setTarget(e.target.value)}
+        />
         <button
           className="btn"
           onClick={() => {
@@ -266,7 +291,7 @@ function GlossaryTab() {
             setTarget("");
           }}
         >
-          添加
+          {t("添加")}
         </button>
       </div>
       <div className="divide-y divide-line rounded-xl border border-line bg-surface">
@@ -279,13 +304,13 @@ function GlossaryTab() {
             <span className="flex-1 truncate font-medium" title={term.target}>
               {term.target}
             </span>
-            {term.locked && <span className="chip !py-0 !text-[10px]">手动</span>}
+            {term.locked && <span className="chip !py-0 !text-[10px]">{t("手动")}</span>}
             <button className="btn btn-ghost !px-1 !py-0 !text-[11px] text-danger" onClick={() => void removeTerm(term.id)}>
               ✕
             </button>
           </div>
         ))}
-        {glossary.length === 0 && <div className="px-2 py-3 text-center text-xs text-ink-3">暂无术语</div>}
+        {glossary.length === 0 && <div className="px-2 py-3 text-center text-xs text-ink-3">{t("暂无术语")}</div>}
       </div>
     </div>
   );
@@ -297,32 +322,40 @@ function QualityTab() {
   const provider = useApp((s) => s.provider);
   const stats = useMemo(() => summarizeBlocks(blocks), [blocks]);
   const report = doc?.parse_report;
+  const t = useT();
 
   return (
     <div className="space-y-3 text-sm">
       <p className="text-xs leading-relaxed text-ink-3">
-        解析质量与翻译质量都如实呈现：不确定的地方宁可标出来，也不假装完美。
+        {t("解析质量与翻译质量都如实呈现：不确定的地方宁可标出来，也不假装完美。")}
       </p>
 
       {report && (
         <div className="rounded-xl border border-line bg-surface p-2">
           <div className="mb-1 flex items-center gap-2 text-xs font-medium">
-            解析自检
-            <span className="chip">{channelLabel(report.channel)}</span>
+            {t("解析自检")}
+            <span className="chip">{t(channelLabel(report.channel))}</span>
           </div>
-          <Row label="版面判定" value={alignmentLabel(report.alignment)} />
-          <Row label="段落数" value={`${report.paragraph_count}`} />
-          <Row label="图表 / 表格 / 公式" value={`${report.figure_count} / ${report.table_count} / ${report.formula_count}`} />
-          <Row label="文本覆盖率" value={`${(report.text_coverage * 100).toFixed(1)}%`} />
-          <Row label="乱码率" value={`${(report.garbage_ratio * 100).toFixed(2)}%`} />
-          <Row label="解析耗时" value={`${report.duration_ms} ms`} />
+          <Row label={t("版面判定")} value={t(alignmentLabel(report.alignment))} />
+          <Row label={t("段落数")} value={`${report.paragraph_count}`} />
+          <Row
+            label={t("图表 / 表格 / 公式")}
+            value={`${report.figure_count} / ${report.table_count} / ${report.formula_count}`}
+          />
+          <Row label={t("文本覆盖率")} value={`${(report.text_coverage * 100).toFixed(1)}%`} />
+          <Row label={t("乱码率")} value={`${(report.garbage_ratio * 100).toFixed(2)}%`} />
+          <Row label={t("解析耗时")} value={`${report.duration_ms} ms`} />
           {report.ocr_pages > 0 && (
             <>
-              <Row label="OCR 处理页数" value={`${report.ocr_pages} 页`} />
-              <Row label="OCR 平均置信度" value={`${(report.ocr_confidence * 100).toFixed(1)}%`} />
+              <Row label={t("OCR 处理页数")} value={t("{count} 页", { count: report.ocr_pages })} />
+              <Row
+                label={t("OCR 平均置信度")}
+                value={`${(report.ocr_confidence * 100).toFixed(1)}%`}
+              />
               <p className="mt-1 text-[11px] leading-relaxed text-warn">
-                OCR 结果是识别重建，标点、连字符与个别字符可能与原页面不一致，
-                关键数字请对照「原版页」核对。
+                {t(
+                  "OCR 结果是识别重建，标点、连字符与个别字符可能与原页面不一致， 关键数字请对照「原版页」核对。",
+                )}
               </p>
             </>
           )}
@@ -337,15 +370,18 @@ function QualityTab() {
       )}
 
       <div className="rounded-xl border border-line bg-surface p-2">
-        <div className="mb-1 text-xs font-medium">翻译质量（当前通道：{provider}）</div>
-        <Row label="已翻译段落" value={`${stats.translated}`} />
-        <Row label="正常" value={`${stats.ok}`} />
-        <Row label="待复核（校验未通过）" value={`${stats.suspect}`} />
-        <Row label="失败" value={`${stats.failed}`} />
+        <div className="mb-1 text-xs font-medium">
+          {t("翻译质量（当前通道：{channel}）", { channel: provider })}
+        </div>
+        <Row label={t("已翻译段落")} value={`${stats.translated}`} />
+        <Row label={t("正常")} value={`${stats.ok}`} />
+        <Row label={t("待复核（校验未通过）")} value={`${stats.suspect}`} />
+        <Row label={t("失败")} value={`${stats.failed}`} />
         {stats.suspect + stats.failed > 0 && (
           <p className="mt-1 text-[11px] leading-relaxed text-ink-3">
-            可疑段落已在正文左侧以黄色标记。「待复核」通常意味着数字、引用或占位符数量与原文不一致，
-            建议对照「原版页」核对，或用云端通道重译该段。
+            {t(
+              "可疑段落已在正文左侧以黄色标记。「待复核」通常意味着数字、引用或占位符数量与原文不一致， 建议对照「原版页」核对，或用云端通道重译该段。",
+            )}
           </p>
         )}
       </div>

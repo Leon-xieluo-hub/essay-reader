@@ -86,6 +86,8 @@ export interface DocBlock {
   table_html: string | null;
   table_rows: string[][] | null;
   table_rows_translated: string[][] | null;
+  /** bold/italic stretches kept from the PDF, as character offsets into `text` */
+  emphasis: { start: number; end: number; style: string }[];
   flags: string[];
   translations: Record<string, string>;
   translation_meta: Record<string, TranslationMeta>;

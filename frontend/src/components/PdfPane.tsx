@@ -3,6 +3,7 @@ import * as pdfjs from "pdfjs-dist";
 import workerUrl from "pdfjs-dist/build/pdf.worker.min.mjs?url";
 
 import { api } from "../api/client";
+import { useT } from "../i18n";
 import { useApp } from "../store";
 
 pdfjs.GlobalWorkerOptions.workerSrc = workerUrl;
@@ -10,6 +11,7 @@ pdfjs.GlobalWorkerOptions.workerSrc = workerUrl;
 const TARGET_WIDTH = 720;
 
 export function PdfPane() {
+  const t = useT();
   const doc = useApp((s) => s.doc);
   const blocks = useApp((s) => s.blocks);
   const activeBlockId = useApp((s) => s.activeBlockId);
@@ -29,7 +31,7 @@ export function PdfPane() {
         if (!cancelled) setPdf(loaded);
       })
       .catch((reason: unknown) => {
-        if (!cancelled) setError(`PDF 渲染失败：${String(reason)}`);
+        if (!cancelled) setError(t("PDF 渲染失败：{reason}", { reason: String(reason) }));
       });
     return () => {
       cancelled = true;
@@ -42,7 +44,7 @@ export function PdfPane() {
   if (!pdf) {
     return (
       <div className="flex h-full items-center justify-center gap-2 text-sm text-ink-2">
-        <span className="skeleton inline-block h-2 w-2 rounded-full" /> 正在加载原始 PDF…
+        <span className="skeleton inline-block h-2 w-2 rounded-full" /> {t("正在加载原始 PDF…")}
       </div>
     );
   }
@@ -50,7 +52,7 @@ export function PdfPane() {
   return (
     <div className="h-full overflow-y-auto bg-paper-3/50 px-4 py-6">
       <p className="mx-auto mb-3 max-w-[820px] text-center text-[11px] text-ink-3">
-        原版页模式：按真实排版渲染，选中段落会在页面上高亮对应区域 —— 这是核对解析与图表位置的最可靠方式。
+        {t("原版页模式：按真实排版渲染，选中段落会在页面上高亮对应区域 —— 这是核对解析与图表位置的最可靠方式。")}
       </p>
       <div className="mx-auto flex max-w-[820px] flex-col gap-6">
         {Array.from({ length: pdf.numPages }, (_, index) => (

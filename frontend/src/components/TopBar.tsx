@@ -3,6 +3,7 @@ import { useState } from "react";
 import { api } from "../api/client";
 import type { ProviderKey } from "../api/types";
 import { navigate } from "../hooks/useHashRoute";
+import { useT } from "../i18n";
 import { useApp, type ReadingMode } from "../store";
 
 import { FloatingPanel } from "./FloatingPanel";
@@ -40,6 +41,8 @@ export function TopBar() {
   const dockTab = useApp((s) => s.dockTab);
   const theme = useApp((s) => s.theme);
   const setTheme = useApp((s) => s.setTheme);
+  const uiLang = useApp((s) => s.uiLang);
+  const setUiLang = useApp((s) => s.setUiLang);
   const search = useApp((s) => s.search);
   const setSearch = useApp((s) => s.setSearch);
   const searchHits = useApp((s) => s.searchHits);
@@ -48,6 +51,7 @@ export function TopBar() {
   const toggleSidebar = useApp((s) => s.toggleSidebar);
   const estimate = useApp((s) => s.estimate);
   const usage = useApp((s) => s.usage);
+  const t = useT();
 
   const [menu, setMenu] = useState<"" | "export" | "channel">("");
   const [channelAnchor, setChannelAnchor] = useState<HTMLElement | null>(null);
@@ -62,10 +66,10 @@ export function TopBar() {
 
   const channelLabel =
     provider === "off"
-      ? "AI 已关闭"
+      ? t("AI 已关闭")
       : provider === "local"
-        ? `本地 · ${activeStatus?.model || "未配置"}`
-        : `云端 · ${activeStatus?.model || "未配置"}`;
+        ? t("本地 · {model}", { model: activeStatus?.model || t("未配置") })
+        : t("云端 · {model}", { model: activeStatus?.model || t("未配置") });
 
   const chooseChannel = async (key: ProviderKey) => {
     setMenu("");
@@ -78,7 +82,7 @@ export function TopBar() {
 
   return (
     <header className="relative z-30 flex flex-wrap items-center gap-2 border-b border-line bg-paper-2/90 px-3 py-2 backdrop-blur">
-      <button className="btn btn-ghost" onClick={toggleSidebar} title="折叠/展开侧栏">
+      <button className="btn btn-ghost" onClick={toggleSidebar} title={t("折叠/展开侧栏")}>
         ☰
       </button>
       <div className="min-w-0">
@@ -90,7 +94,7 @@ export function TopBar() {
       {doc && (
         <>
           <span className="hidden text-xs text-ink-3 sm:inline">
-            {doc.page_count} 页 · {doc.authors.slice(0, 2).join(", ")}
+            {t("{pages} 页 · {authors}", { pages: doc.page_count, authors: doc.authors.slice(0, 2).join(", ") })}
           </span>
 
           <span className="mx-1 hidden h-5 w-px bg-line sm:block" />
@@ -101,10 +105,10 @@ export function TopBar() {
                 key={item.key}
                 className="btn btn-ghost !px-2.5 !py-1"
                 data-active={mode === item.key}
-                title={item.hint}
+                title={t(item.hint)}
                 onClick={() => setMode(item.key)}
               >
-                {item.label}
+                {t(item.label)}
               </button>
             ))}
           </div>
@@ -112,7 +116,7 @@ export function TopBar() {
           <div className="flex items-center gap-1.5">
             <input
               className="input !w-44"
-              placeholder="搜索本文…"
+              placeholder={t("搜索本文…")}
               value={search}
               onChange={(event) => setSearch(event.target.value)}
               onKeyDown={(event) => {
@@ -138,11 +142,11 @@ export function TopBar() {
             ref={setChannelAnchor}
             className={`chip ${channelReady ? "chip-accent" : "chip-warn"} cursor-pointer`}
             onClick={() => setMenu(menu === "channel" ? "" : "channel")}
-            title={activeStatus?.detail || "选择模型通道"}
+            title={activeStatus?.detail || t("选择模型通道")}
           >
             <span className={`h-1.5 w-1.5 rounded-full ${channelReady ? "bg-ok" : "bg-warn"}`} />
             {channelLabel}
-            {!channelReady && provider !== "off" && <span className="ml-1 underline">如何启用？</span>}
+            {!channelReady && provider !== "off" && <span className="ml-1 underline">{t("如何启用？")}</span>}
           </button>
 
           <FloatingPanel
@@ -151,11 +155,11 @@ export function TopBar() {
             onClose={() => setMenu("")}
             width={340}
           >
-            <div className="mb-2 font-medium">模型通道 · 场景分工</div>
+            <div className="mb-2 font-medium">{t("模型通道 · 场景分工")}</div>
             <ChannelOption
-              title="本地模型"
-              badge="免费 · 离线 · 数据不出本机"
-              detail={localStatus?.detail || "检测中…"}
+              title={t("本地模型")}
+              badge={t("免费 · 离线 · 数据不出本机")}
+              detail={localStatus?.detail || t("检测中…")}
               available={Boolean(localStatus?.available)}
               active={provider === "local"}
               onClick={() => void chooseChannel("local")}
@@ -163,12 +167,12 @@ export function TopBar() {
                 setMenu("");
                 setGuideFor("local");
               }}
-              note="长难句与专业术语建议人工复核，界面会标出可疑段落"
+              note={t("长难句与专业术语建议人工复核，界面会标出可疑段落")}
             />
             <ChannelOption
-              title="云端模型"
-              badge="更准确 · 按 token 计费"
-              detail={cloudStatus?.detail || "检测中…"}
+              title={t("云端模型")}
+              badge={t("更准确 · 按 token 计费")}
+              detail={cloudStatus?.detail || t("检测中…")}
               available={Boolean(cloudStatus?.available)}
               active={provider === "cloud"}
               onClick={() => void chooseChannel("cloud")}
@@ -176,22 +180,22 @@ export function TopBar() {
                 setMenu("");
                 setGuideFor("cloud");
               }}
-              note="翻译前会给出预计 token 与费用；不可用时可切回本地"
+              note={t("翻译前会给出预计 token 与费用；不可用时可切回本地")}
             />
             <ChannelOption
-              title="关闭 AI（纯阅读）"
-              badge="零 token · 零网络"
-              detail="只解析与阅读，翻译/总结/问答入口置灰"
+              title={t("关闭 AI（纯阅读）")}
+              badge={t("零 token · 零网络")}
+              detail={t("只解析与阅读，翻译/总结/问答入口置灰")}
               available
               active={provider === "off"}
               onClick={() => void chooseChannel("off")}
             />
             <div className="mt-2 flex gap-1">
               <button className="btn flex-1 justify-center" onClick={() => setGuideFor(provider === "cloud" ? "cloud" : "local")}>
-                环境搭建引导
+                {t("环境搭建引导")}
               </button>
               <button className="btn flex-1 justify-center" onClick={() => navigate("#/settings")}>
-                打开设置
+                {t("打开设置")}
               </button>
             </div>
           </FloatingPanel>
@@ -200,11 +204,11 @@ export function TopBar() {
             className="select !w-28"
             value={lang}
             onChange={(event) => setLang(event.target.value)}
-            title="目标语言"
+            title={t("目标语言")}
           >
             {LANGS.map((item) => (
               <option key={item.key} value={item.key}>
-                {item.label}
+                {t(item.label)}
               </option>
             ))}
           </select>
@@ -218,23 +222,23 @@ export function TopBar() {
             }}
             title={
               provider === "off"
-                ? "AI 功能已关闭，请在通道菜单中启用"
+                ? t("AI 功能已关闭，请在通道菜单中启用")
                 : !channelReady
-                  ? "当前通道不可用：点击查看启用步骤"
+                  ? t("当前通道不可用：点击查看启用步骤")
                   : provider === "local"
                     ? estimate
-                      ? `本地模型：免费离线，预计约 ${Math.ceil(estimate.local_eta_seconds / 60)} 分钟`
-                      : "本地模型翻译：免费、离线"
+                      ? t("本地模型：免费离线，预计约 {minutes} 分钟", { minutes: Math.ceil(estimate.local_eta_seconds / 60) })
+                      : t("本地模型翻译：免费、离线")
                     : estimate
-                      ? `云端：预计 ${estimate.estimated_tokens_in + estimate.estimated_tokens_out} token ≈ ¥${estimate.estimated_cost_cny}`
-                      : "云端翻译：更快更准，按 token 计费"
+                      ? t("云端：预计 {tokens} token ≈ ¥{cost}", { tokens: estimate.estimated_tokens_in + estimate.estimated_tokens_out, cost: estimate.estimated_cost_cny })
+                      : t("云端翻译：更快更准，按 token 计费")
             }
           >
             {busy && task?.kind === "translate"
-              ? `翻译中 ${task.done}/${task.total || "?"}`
+              ? t("翻译中 {done}/{total}", { done: task.done, total: task.total || "?" })
               : channelReady
-                ? "翻译全文"
-                : "启用通道"}
+                ? t("翻译全文")
+                : t("启用通道")}
           </button>
 
           <div className="flex items-center gap-1">
@@ -243,20 +247,20 @@ export function TopBar() {
               data-active={dockOpen && dockTab === "summary"}
               onClick={() => toggleDock("summary")}
             >
-              要点
+              {t("要点")}
             </button>
             <button
               className="btn"
               data-active={dockOpen && dockTab === "chat"}
               onClick={() => toggleDock("chat")}
             >
-              问答
+              {t("问答")}
             </button>
             <button className="btn" onClick={() => setDockTab("notes")}>
-              笔记
+              {t("笔记")}
             </button>
             <button className="btn" onClick={() => setDockTab("quality")}>
-              解析质量
+              {t("解析质量")}
             </button>
           </div>
 
@@ -265,7 +269,7 @@ export function TopBar() {
             className="btn"
             onClick={() => setMenu(menu === "export" ? "" : "export")}
           >
-            导出
+            {t("导出")}
           </button>
           <FloatingPanel
             anchor={exportAnchor}
@@ -285,7 +289,7 @@ export function TopBar() {
                 href={api.exportUrl(doc.id, lang, item.mode)}
                 onClick={() => setMenu("")}
               >
-                {item.label}
+                {t(item.label)}
               </a>
             ))}
             <a
@@ -295,7 +299,7 @@ export function TopBar() {
               rel="noreferrer"
               onClick={() => setMenu("")}
             >
-              原始 PDF
+              {t("原始 PDF")}
             </a>
           </FloatingPanel>
         </>
@@ -303,19 +307,28 @@ export function TopBar() {
 
       <div className="ml-auto flex items-center gap-1">
         {usage && usage.cloud_tokens_out + usage.cloud_tokens_in > 0 && (
-          <span className="chip" title="云端累计用量（本地通道不消耗 token）">
-            云端 {usage.cloud_tokens_in + usage.cloud_tokens_out} tok · ¥
-            {usage.cloud_estimated_cost_cny.toFixed(3)}
+          <span className="chip" title={t("云端累计用量（本地通道不消耗 token）")}>
+            {t("云端 {tokens} tok · ¥{cost}", {
+              tokens: usage.cloud_tokens_in + usage.cloud_tokens_out,
+              cost: usage.cloud_estimated_cost_cny.toFixed(3),
+            })}
           </span>
         )}
         <button
           className="btn btn-ghost"
-          title="切换主题（跟随系统 → 浅色 → 深色）"
+          title={t("界面语言 / Interface language")}
+          onClick={() => setUiLang(uiLang === "zh" ? "en" : "zh")}
+        >
+          {uiLang === "en" ? "EN" : "中"}
+        </button>
+        <button
+          className="btn btn-ghost"
+          title={t("切换主题（跟随系统 → 浅色 → 深色）")}
           onClick={() => setTheme(theme === "system" ? "light" : theme === "light" ? "dark" : "system")}
         >
           {theme === "system" ? "◐" : theme === "light" ? "☀" : "☾"}
         </button>
-        <button className="btn btn-ghost" onClick={() => navigate("#/settings")} title="设置">
+        <button className="btn btn-ghost" onClick={() => navigate("#/settings")} title={t("设置")}>
           ⚙
         </button>
       </div>
@@ -325,7 +338,7 @@ export function TopBar() {
           <ProgressLine
             done={task?.done ?? 0}
             total={task?.total ?? 0}
-            message={task?.message || "处理中…"}
+            message={task?.message || t("处理中…")}
             provider={task?.provider || provider}
           />
         </div>
@@ -346,6 +359,7 @@ function ChannelOption(props: {
   onClick: () => void;
   onGuide?: () => void;
 }) {
+  const t = useT();
   return (
     <div
       className={`mb-1.5 rounded-xl border p-2 transition ${
@@ -356,7 +370,7 @@ function ChannelOption(props: {
         <div className="flex items-center justify-between gap-2">
           <span className="font-medium">{props.title}</span>
           <span className={`chip ${props.available ? "chip-ok" : "chip-warn"}`}>
-            {props.available ? "可用" : "不可用"}
+            {props.available ? t("可用") : t("不可用")}
           </span>
         </div>
         <div className="mt-0.5 text-xs text-ink-2">{props.badge}</div>
@@ -365,7 +379,7 @@ function ChannelOption(props: {
       </button>
       {!props.available && props.onGuide && (
         <button className="btn mt-1.5 w-full justify-center !text-[11px]" onClick={props.onGuide}>
-          查看启用步骤（下载 / 部署引导）
+          {t("查看启用步骤（下载 / 部署引导）")}
         </button>
       )}
     </div>
@@ -373,6 +387,7 @@ function ChannelOption(props: {
 }
 
 function ProgressLine(props: { done: number; total: number; message: string; provider: string }) {
+  const t = useT();
   const percent = props.total ? Math.round((props.done / props.total) * 100) : 8;
   return (
     <div className="flex items-center gap-2 px-1 pb-0.5 text-xs text-ink-2">
@@ -383,7 +398,7 @@ function ProgressLine(props: { done: number; total: number; message: string; pro
         />
       </div>
       <span className="truncate max-w-[52ch]">{props.message}</span>
-      <span className="chip">{props.provider === "local" ? "本地" : "云端"}</span>
+      <span className="chip">{props.provider === "local" ? t("本地") : t("云端")}</span>
     </div>
   );
 }

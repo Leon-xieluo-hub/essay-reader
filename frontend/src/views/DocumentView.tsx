@@ -1,6 +1,7 @@
 import { PdfPane } from "../components/PdfPane";
 import { ReadingPane } from "../components/ReadingPane";
 import { Dock } from "../components/TranslationDock";
+import { useT } from "../i18n";
 import { useApp } from "../store";
 
 export function DocumentView() {
@@ -54,32 +55,33 @@ function StatusStrip({
   cloudReady: boolean;
   warning?: string;
 }) {
+  const t = useT();
   const messages: { kind: string; text: string }[] = [];
 
   if (offline) {
     messages.push({
       kind: "chip-warn",
-      text: "当前离线 · 解析、阅读、笔记照常可用；本地模型翻译不受影响，云端入口已置灰",
+      text: t("当前离线 · 解析、阅读、笔记照常可用；本地模型翻译不受影响，云端入口已置灰"),
     });
   }
   if (provider === "off") {
     messages.push({
       kind: "chip",
-      text: "纯阅读模式（零 token、零网络）：需要翻译或总结时，请在顶栏切换模型通道",
+      text: t("纯阅读模式（零 token、零网络）：需要翻译或总结时，请在顶栏切换模型通道"),
     });
   } else if (provider === "local") {
     messages.push({
       kind: "chip-ok",
       text: localReady
-        ? "本地模型 · 免费离线，长难句与术语建议复核（可疑段落会被标出）"
-        : "本地模型未就绪：请在设置中下载模型，或切到云端通道",
+        ? t("本地模型 · 免费离线，长难句与术语建议复核（可疑段落会被标出）")
+        : t("本地模型未就绪：请在设置中下载模型，或切到云端通道"),
     });
   } else if (provider === "cloud") {
     messages.push({
       kind: cloudReady ? "chip-warn" : "chip-danger",
       text: cloudReady
-        ? "云端模型 · 更准确，按 token 计费（翻译前会给出预估）"
-        : "云端通道不可用：检查 API Key 与网络，或切回本地通道",
+        ? t("云端模型 · 更准确，按 token 计费（翻译前会给出预估）")
+        : t("云端通道不可用：检查 API Key 与网络，或切回本地通道"),
     });
   }
   if (warning) messages.push({ kind: "chip-warn", text: warning });

@@ -26,7 +26,10 @@ from app.services.protect import PLACEHOLDER_RE, mask, unmask, validate
 
 ProgressCb = Optional[Callable[[int, int, str], Awaitable[None]]]
 
-TRANSLATABLE = {"text", "heading", "caption", "reference", "footnote", "table"}
+# `formula` is included again: a block typed formula that still carries text is a
+# prose paragraph the parser could not classify confidently, while a real cropped
+# equation has no text and is skipped by the letter check below anyway.
+TRANSLATABLE = {"text", "heading", "caption", "reference", "footnote", "formula", "table"}
 SKIP_TYPES = {"header", "footer"}
 # A block needs at least one letter (Latin or CJK) outside its protected
 # fragments to be worth a model call; "5. 6. 7. 8." and URL-only lines are not.

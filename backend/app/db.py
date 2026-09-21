@@ -30,7 +30,8 @@ CREATE TABLE IF NOT EXISTS blocks (
     id TEXT PRIMARY KEY, doc_id TEXT NOT NULL, ord INTEGER NOT NULL, page INTEGER NOT NULL,
     type TEXT NOT NULL, text TEXT DEFAULT '', bbox TEXT DEFAULT '[]', col INTEGER DEFAULT 0,
     level INTEGER, size REAL DEFAULT 0, image_path TEXT, latex TEXT, caption TEXT,
-    table_html TEXT, table_rows TEXT, table_rows_translated TEXT, flags TEXT DEFAULT '[]'
+    table_html TEXT, table_rows TEXT, table_rows_translated TEXT, flags TEXT DEFAULT '[]',
+    emphasis TEXT DEFAULT '[]'
 );
 CREATE INDEX IF NOT EXISTS idx_blocks_doc ON blocks(doc_id, ord);
 CREATE TABLE IF NOT EXISTS translations (
@@ -90,6 +91,8 @@ def _migrate(conn: sqlite3.Connection) -> None:
         conn.execute("ALTER TABLE blocks ADD COLUMN size REAL DEFAULT 0")
     if "table_rows_translated" not in columns:
         conn.execute("ALTER TABLE blocks ADD COLUMN table_rows_translated TEXT")
+    if "emphasis" not in columns:
+        conn.execute("ALTER TABLE blocks ADD COLUMN emphasis TEXT DEFAULT '[]'")
 
 
 def _rows(sql: str, params: Iterable[Any] = ()) -> list:
@@ -173,14 +176,15 @@ def insert_blocks(blocks: list) -> None:
         conn.executemany(
             """INSERT OR REPLACE INTO blocks
                (id, doc_id, ord, page, type, text, bbox, col, level, size, image_path,
-                latex, caption, table_html, table_rows, table_rows_translated, flags)
-               VALUES (?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?)""",
+                latex, caption, table_html, table_rows, table_rows_translated, flags, emphasis)
+               VALUES (?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?)""",
             [(b.id, b.doc_id, b.order, b.page, b.type, b.text,
               json.dumps(b.bbox.as_list()), b.column, b.level, b.size, b.image_path, b.latex,
               b.caption, b.table_html,
               json.dumps(b.table_rows, ensure_ascii=False) if b.table_rows else None,
               json.dumps(b.table_rows_translated, ensure_ascii=False) if b.table_rows_translated else None,
-              json.dumps(b.flags, ensure_ascii=False)) for b in blocks],
+              json.dumps(b.flags, ensure_ascii=False),
+              json.dumps([run.model_dump() for run in b.emphasis], ensure_ascii=False)) for b in blocks],
         )
         conn.commit()
 
@@ -201,6 +205,7 @@ def get_blocks(doc_id: str) -> list:
             table_rows_translated=(
                 json.loads(row["table_rows_translated"]) if row["table_rows_translated"] else None
             ),
+            emphasis=json.loads(row["emphasis"] or "[]"),
             flags=json.loads(row["flags"] or "[]"),
         ))
     return out

@@ -1,10 +1,12 @@
-import { useEffect } from "react";
+import { useEffect, useLayoutEffect, useRef } from "react";
 
+import { useT } from "../i18n";
 import { useApp } from "../store";
 
 import { BlockView } from "./BlockView";
 
 export function ReadingPane() {
+  const t = useT();
   const blocks = useApp((s) => s.blocks);
   const mode = useApp((s) => s.mode);
   const fontScale = useApp((s) => s.fontScale);
@@ -16,6 +18,7 @@ export function ReadingPane() {
   const translateBlock = useApp((s) => s.translateBlock);
   const searchIndex = useApp((s) => s.searchIndex);
   const searchHits = useApp((s) => s.searchHits);
+  const anchorRef = useRef<string | null>(null);
 
   const visible = blocks.filter((block) => block.type !== "header" && block.type !== "footer");
   // Front matter (article info / citation / keywords rails) is shown as its own
@@ -34,18 +37,44 @@ export function ReadingPane() {
     const onScroll = () => {
       const top = container.getBoundingClientRect().top + 120;
       let current: string | null = null;
+      let anchor: string | null = null;
       for (const block of body) {
         const element = document.getElementById(`block-${block.id}`);
         if (!element) continue;
         if (element.getBoundingClientRect().top <= top) current = block.id;
         else break;
       }
+      // the first paragraph at/after the viewport top is what a mode switch has
+      // to keep in place: bilingual → translation-only changes every block's
+      // height, and the browser would otherwise clamp the scroll position
+      for (const block of body) {
+        const element = document.getElementById(`block-${block.id}`);
+        if (!element) continue;
+        if (element.getBoundingClientRect().top >= container.getBoundingClientRect().top - 4) {
+          anchor = block.id;
+          break;
+        }
+      }
+      if (anchor) anchorRef.current = anchor;
       if (current) setScrolledBlock(current);
     };
     container.addEventListener("scroll", onScroll, { passive: true });
     onScroll();
     return () => container.removeEventListener("scroll", onScroll);
   }, [body, setScrolledBlock]);
+
+  // Switching 双语 / 译文 / 原文 rewrites every block, so keep the paragraph the
+  // reader was looking at pinned to the top instead of jumping to the beginning.
+  useLayoutEffect(() => {
+    const container = document.getElementById("reading-scroll");
+    const id = anchorRef.current;
+    if (!container || !id) return;
+    const element = document.getElementById(`block-${id}`);
+    if (!element) return;
+    const delta =
+      element.getBoundingClientRect().top - container.getBoundingClientRect().top - 12;
+    if (Math.abs(delta) > 1) container.scrollTop += delta;
+  }, [mode]);
 
   // jump to the active search hit
   useEffect(() => {
@@ -62,14 +91,14 @@ export function ReadingPane() {
         onClick={() => setActiveBlock(null)}
       >
         {visible.length === 0 && (
-          <div className="mt-16 text-center text-sm text-ink-2">正在解析或没有可显示的正文…</div>
+          <div className="mt-16 text-center text-sm text-ink-2">{t("正在解析或没有可显示的正文…")}</div>
         )}
 
         {leadingMeta.length > 0 && (
           <section className="mb-6 rounded-xl border border-line bg-paper-2/70 p-3">
             <div className="mb-2 flex items-center gap-2 text-[11px] text-ink-3">
-              <span className="chip">文章信息</span>
-              <span>以下内容来自出版商的元信息栏，不属于正文，因此单独列出</span>
+              <span className="chip">{t("文章信息")}</span>
+              <span>{t("以下内容来自出版商的元信息栏，不属于正文，因此单独列出")}</span>
             </div>
             <div className="space-y-1.5" style={{ fontFamily: "var(--font-sans)", fontSize: "0.83rem" }}>
               {leadingMeta.map((block) => (
@@ -99,7 +128,7 @@ export function ReadingPane() {
         ))}
         {visible.length > 0 && (
           <p className="mt-12 text-center text-xs text-ink-3">
-            解析结果与原页面可能存在细微差异 —— 如需核对，可切换到「原版页」模式查看原始排版。
+            {t("解析结果与原页面可能存在细微差异 —— 如需核对，可切换到「原版页」模式查看原始排版。")}
           </p>
         )}
       </div>

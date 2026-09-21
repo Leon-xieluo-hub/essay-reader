@@ -1,8 +1,10 @@
 import { useEffect } from "react";
 
+import { useT } from "../i18n";
 import { useApp } from "../store";
 
 export function Lightbox() {
+  const t = useT();
   const lightbox = useApp((s) => s.lightbox);
   const close = useApp((s) => s.closeLightbox);
 
@@ -28,10 +30,10 @@ export function Lightbox() {
         onClick={(event) => event.stopPropagation()}
       />
       <div className="max-w-[80ch] text-center text-xs leading-relaxed text-paper">
-        {lightbox.caption || "原图裁切（解析器按 bbox 保留，可与正文对照）"}
+        {lightbox.caption || t("原图裁切（解析器按 bbox 保留，可与正文对照）")}
       </div>
       <button className="btn" onClick={close}>
-        关闭 (Esc)
+        {t("关闭 (Esc)")}
       </button>
     </div>
   );

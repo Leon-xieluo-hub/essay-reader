@@ -3,9 +3,11 @@ import { useEffect, useState } from "react";
 import { api } from "../api/client";
 import type { OcrMode } from "../api/types";
 import { navigate } from "../hooks/useHashRoute";
+import { useT } from "../i18n";
 import { useApp } from "../store";
 
 export function SettingsPanel() {
+  const t = useT();
   const settings = useApp((s) => s.settings);
   const providers = useApp((s) => s.providers);
   const environment = useApp((s) => s.environment);
@@ -62,10 +64,10 @@ export function SettingsPanel() {
 
   const startPull = (model: string) => {
     if (!model.trim()) {
-      toast("warn", "请先填写模型名称，例如 qwen3:8b");
+      toast("warn", t("请先填写模型名称，例如 qwen3:8b"));
       return;
     }
-    setPull({ model, text: "连接本地推理服务…", percent: null });
+    setPull({ model, text: t("连接本地推理服务…"), percent: null });
     api.pullModel(
       model,
       (event) => {
@@ -74,13 +76,13 @@ export function SettingsPanel() {
         const completed = Number(event.completed ?? 0);
         const percent = total > 0 ? Math.round((completed / total) * 100) : null;
         if (typeof event.error === "string") {
-          setPull({ model, text: `下载失败：${event.error}`, percent: null });
+          setPull({ model, text: t("下载失败：{error}", { error: event.error }), percent: null });
           return;
         }
-        setPull({ model, text: status || "下载中", percent });
+        setPull({ model, text: status || t("下载中"), percent });
       },
       () => {
-        setPull((current) => (current ? { ...current, text: current.text || "完成" } : null));
+        setPull((current) => (current ? { ...current, text: current.text || t("完成") } : null));
       },
     );
   };
@@ -89,36 +91,45 @@ export function SettingsPanel() {
     <div className="fixed inset-0 z-50 flex justify-center overflow-y-auto bg-ink/50 p-4 backdrop-blur-sm">
       <div className="card my-4 w-full max-w-3xl p-5">
         <div className="mb-4 flex items-center justify-between">
-          <h2 className="text-base font-semibold">设置</h2>
+          <h2 className="text-base font-semibold">{t("设置")}</h2>
           <button className="btn" onClick={() => navigate("#/")}>
-            关闭
+            {t("关闭")}
           </button>
         </div>
 
-        <Section title="模型通道" note="本地=免费离线；云端=更准但按 token 计费。两种通道可随时切换，术语表与已翻译段落共用。">
+        <Section
+          title={t("模型通道")}
+          note={t("本地=免费离线；云端=更准但按 token 计费。两种通道可随时切换，术语表与已翻译段落共用。")}
+        >
           <div className="grid gap-3 sm:grid-cols-2">
             <StatusCard
-              title="本地模型（Ollama）"
+              title={t("本地模型（Ollama）")}
               available={Boolean(local?.available)}
-              detail={local?.detail || "检测中…"}
-              lines={[`端点 ${local?.base_url || "-"}`, `当前模型 ${local?.model || "-"}`]}
+              detail={local?.detail || t("检测中…")}
+              lines={[
+                t("端点 {url}", { url: local?.base_url || "-" }),
+                t("当前模型 {model}", { model: local?.model || "-" }),
+              ]}
             />
             <StatusCard
-              title="云端模型（OpenAI 兼容）"
+              title={t("云端模型（OpenAI 兼容）")}
               available={Boolean(cloud?.available)}
-              detail={cloud?.detail || "检测中…"}
-              lines={[`端点 ${cloud?.base_url || "-"}`, `当前模型 ${cloud?.model || "-"}`]}
+              detail={cloud?.detail || t("检测中…")}
+              lines={[
+                t("端点 {url}", { url: cloud?.base_url || "-" }),
+                t("当前模型 {model}", { model: cloud?.model || "-" }),
+              ]}
             />
           </div>
         </Section>
 
         <Section
-          title="本地模型管理"
-          note="首次使用需要一次性联网下载模型权重（约 4~5GB）；下载完成后即可全程离线使用。"
+          title={t("本地模型管理")}
+          note={t("首次使用需要一次性联网下载模型权重（约 4~5GB）；下载完成后即可全程离线使用。")}
         >
           <div className="grid gap-2 sm:grid-cols-2">
             <label className="text-xs text-ink-2">
-              推理服务端点
+              {t("推理服务端点")}
               <input
                 className="input mt-1"
                 value={form.local_base_url}
@@ -126,7 +137,7 @@ export function SettingsPanel() {
               />
             </label>
             <label className="text-xs text-ink-2">
-              模型名称
+              {t("模型名称")}
               <input
                 className="input mt-1"
                 value={form.local_model}
@@ -138,7 +149,7 @@ export function SettingsPanel() {
 
           <div className="mt-3 flex flex-wrap items-center gap-2">
             <button className="btn btn-primary" onClick={() => startPull(form.local_model)}>
-              下载 / 更新此模型
+              {t("下载 / 更新此模型")}
             </button>
             <button
               className="btn"
@@ -149,10 +160,12 @@ export function SettingsPanel() {
                   .catch(() => undefined);
               }}
             >
-              刷新已安装列表
+              {t("刷新已安装列表")}
             </button>
             <span className="text-xs text-ink-3">
-              {models.length ? `已安装：${models.join(", ")}` : "未检测到已安装模型"}
+              {models.length
+                ? t("已安装：{models}", { models: models.join(", ") })
+                : t("未检测到已安装模型")}
             </span>
           </div>
 
@@ -174,44 +187,49 @@ export function SettingsPanel() {
           )}
 
           <details className="mt-3 text-xs text-ink-2">
-            <summary className="cursor-pointer">无外网环境？离线导入模型包</summary>
+            <summary className="cursor-pointer">{t("无外网环境？离线导入模型包")}</summary>
             <p className="mt-2 leading-relaxed">
-              在能联网的机器上执行 <code className="font-mono">ollama pull {form.local_model || "qwen3:8b"}</code>
-              ，把 Ollama 的模型目录（Windows: <code className="font-mono">%USERPROFILE%\.ollama\models</code>）
-              整体拷贝到本机同一路径，然后重启本地推理服务即可，全程无需联网。
+              {t("在能联网的机器上执行")}{" "}
+              <code className="font-mono">ollama pull {form.local_model || "qwen3:8b"}</code>
+              {t("，把 Ollama 的模型目录（Windows:")}{" "}
+              <code className="font-mono">%USERPROFILE%\.ollama\models</code>
+              {t("）整体拷贝到本机同一路径，然后重启本地推理服务即可，全程无需联网。")}
             </p>
           </details>
         </Section>
 
         <Section
-          title="扫描件 OCR（本地离线）"
-          note="没有文本层的扫描 PDF 需要 OCR 才能阅读与翻译。RapidOCR 在 CPU 上运行，完全离线，约 1~3 秒/页；它不会与本地模型抢显存。"
+          title={t("扫描件 OCR（本地离线）")}
+          note={t("没有文本层的扫描 PDF 需要 OCR 才能阅读与翻译。RapidOCR 在 CPU 上运行，完全离线，约 1~3 秒/页；它不会与本地模型抢显存。")}
         >
           <div className="flex flex-wrap items-center gap-2 text-xs">
             <span className={`chip ${environment?.ocr?.available ? "chip-ok" : "chip-warn"}`}>
-              {environment?.ocr?.available ? "OCR 引擎就绪" : "OCR 不可用"}
+              {environment?.ocr?.available ? t("OCR 引擎就绪") : t("OCR 不可用")}
             </span>
             <span className="text-ink-3">{environment?.ocr?.detail}</span>
           </div>
           <div className="mt-2 flex flex-wrap items-center gap-3 text-sm">
-            <span>处理方式</span>
+            <span>{t("处理方式")}</span>
             <select
               className="select !w-56"
               value={ocrMode}
               onChange={(event) => setOcrMode(event.target.value as OcrMode)}
             >
-              <option value="auto">自动：仅对扫描页做 OCR（推荐）</option>
-              <option value="force">强制：所有页面都过 OCR</option>
-              <option value="off">关闭：只用文本层</option>
+              <option value="auto">{t("自动：仅对扫描页做 OCR（推荐）")}</option>
+              <option value="force">{t("强制：所有页面都过 OCR")}</option>
+              <option value="off">{t("关闭：只用文本层")}</option>
             </select>
           </div>
           <p className="mt-2 text-[11px] leading-relaxed text-ink-3">
-            切换后立即生效，下次上传生效。OCR 结果会在解析质量里标注处理页数与置信度，
-            并在质量分中体现不确定性 —— 建议对照「原版页」核对关键数字。
+            {t("切换后立即生效，下次上传生效。OCR 结果会在解析质量里标注处理页数与置信度，")}{" "}
+            {t("并在质量分中体现不确定性 —— 建议对照「原版页」核对关键数字。")}
           </p>
         </Section>
 
-        <Section title="云端 API（可选）" note="密钥只保存在本机后端，不会写入前端或仓库，界面仅显示是否已配置。">
+        <Section
+          title={t("云端 API（可选）")}
+          note={t("密钥只保存在本机后端，不会写入前端或仓库，界面仅显示是否已配置。")}
+        >
           <div className="grid gap-2 sm:grid-cols-2">
             <label className="text-xs text-ink-2">
               Base URL
@@ -222,7 +240,7 @@ export function SettingsPanel() {
               />
             </label>
             <label className="text-xs text-ink-2">
-              模型
+              {t("模型")}
               <input
                 className="input mt-1"
                 value={form.cloud_model}
@@ -231,80 +249,81 @@ export function SettingsPanel() {
             </label>
           </div>
           <label className="mt-2 block text-xs text-ink-2">
-            API Key {settings?.cloud_api_key_set && <span className="chip chip-ok ml-1">已配置</span>}
+            API Key{" "}
+            {settings?.cloud_api_key_set && <span className="chip chip-ok ml-1">{t("已配置")}</span>}
             <input
               className="input mt-1"
               type="password"
               value={form.cloud_api_key}
-              placeholder={settings?.cloud_api_key_set ? "留空表示不修改" : "sk-…"}
+              placeholder={settings?.cloud_api_key_set ? t("留空表示不修改") : "sk-…"}
               onChange={(event) => setForm({ ...form, cloud_api_key: event.target.value })}
             />
           </label>
         </Section>
 
         <Section
-          title="翻译与质量"
-          note="本地通道并发固定为 1（显存约束），并且必须开启质量校验——本地模型在数字与引用上更容易出错。"
+          title={t("翻译与质量")}
+          note={t("本地通道并发固定为 1（显存约束），并且必须开启质量校验——本地模型在数字与引用上更容易出错。")}
         >
           <div className="grid gap-2 sm:grid-cols-3">
             <NumberField
-              label="分块 token 上限"
+              label={t("分块 token 上限")}
               value={form.chunk_token_budget}
               onChange={(value) => setForm({ ...form, chunk_token_budget: value })}
-              hint="本地模型建议 800~1200"
+              hint={t("本地模型建议 800~1200")}
             />
             <NumberField
-              label="上下文段落数"
+              label={t("上下文段落数")}
               value={form.context_paragraphs}
               onChange={(value) => setForm({ ...form, context_paragraphs: value })}
-              hint="用于减少指代错误"
+              hint={t("用于减少指代错误")}
             />
             <NumberField
-              label="质量重译次数"
+              label={t("质量重译次数")}
               value={form.quality_retry_limit}
               onChange={(value) => setForm({ ...form, quality_retry_limit: value })}
             />
             <NumberField
-              label="本地并发"
+              label={t("本地并发")}
               value={form.local_concurrency}
               onChange={(value) => setForm({ ...form, local_concurrency: value })}
-              hint="显存不足时保持 1"
+              hint={t("显存不足时保持 1")}
             />
             <NumberField
-              label="云端并发"
+              label={t("云端并发")}
               value={form.cloud_concurrency}
               onChange={(value) => setForm({ ...form, cloud_concurrency: value })}
             />
             <NumberField
-              label="单篇 token 预算"
+              label={t("单篇 token 预算")}
               value={form.token_budget_per_doc}
               onChange={(value) => setForm({ ...form, token_budget_per_doc: value })}
-              hint="0 表示不限制"
+              hint={t("0 表示不限制")}
             />
           </div>
         </Section>
 
-        <Section title="用量与费用" note="云端按 token 计费；本地只统计处理量与耗时。">
+        <Section title={t("用量与费用")} note={t("云端按 token 计费；本地只统计处理量与耗时。")}>
           <div className="grid gap-2 text-sm sm:grid-cols-4">
-            <Metric label="云端输入 token" value={usage?.cloud_tokens_in ?? 0} />
-            <Metric label="云端输出 token" value={usage?.cloud_tokens_out ?? 0} />
-            <Metric label="预估费用" value={`¥ ${(usage?.cloud_estimated_cost_cny ?? 0).toFixed(3)}`} />
-            <Metric label="本地处理段落" value={usage?.local_blocks_translated ?? 0} />
+            <Metric label={t("云端输入 token")} value={usage?.cloud_tokens_in ?? 0} />
+            <Metric label={t("云端输出 token")} value={usage?.cloud_tokens_out ?? 0} />
+            <Metric label={t("预估费用")} value={`¥ ${(usage?.cloud_estimated_cost_cny ?? 0).toFixed(3)}`} />
+            <Metric label={t("本地处理段落")} value={usage?.local_blocks_translated ?? 0} />
           </div>
           <button className="btn mt-2" onClick={() => void resetUsage()}>
-            清零统计
+            {t("清零统计")}
           </button>
         </Section>
 
-        <Section title="阅读与外观">
+        <Section title={t("阅读与外观")}>
           <div className="flex flex-wrap items-center gap-3 text-sm">
-            <span>主题</span>
+            <span>{t("主题")}</span>
             <select className="select !w-32" value={theme} onChange={(e) => setTheme(e.target.value as never)}>
-              <option value="system">跟随系统</option>
-              <option value="light">米白浅色</option>
-              <option value="dark">夜间</option>
+              <option value="system">{t("跟随系统")}</option>
+              <option value="light">{t("米白浅色")}</option>
+              <option value="dark">{t("夜间")}</option>
             </select>
-            <span className="ml-2">字号 {Math.round(fontScale * 100)}%</span>
+            <span className="ml-2">{t("字号 {percent}%", { percent: Math.round(fontScale * 100) })}</span>
             <input
               type="range"
               min={0.85}
@@ -316,21 +335,21 @@ export function SettingsPanel() {
           </div>
         </Section>
 
-        <Section title="离线状态">
+        <Section title={t("离线状态")}>
           <div className="flex flex-wrap items-center gap-2 text-xs">
             <span className={`chip ${environment?.internet ? "chip-ok" : "chip-warn"}`}>
-              网络：{environment?.internet ? "已连接" : "离线"}
+              {environment?.internet ? t("网络：已连接") : t("网络：离线")}
             </span>
-            <span className="chip chip-ok">解析 / 阅读 / 笔记：始终离线可用</span>
+            <span className="chip chip-ok">{t("解析 / 阅读 / 笔记：始终离线可用")}</span>
             <span className={`chip ${local?.available ? "chip-ok" : "chip-warn"}`}>
-              本地翻译：{local?.available ? "可用（零 token）" : "需先下载模型"}
+              {local?.available ? t("本地翻译：可用（零 token）") : t("本地翻译：需先下载模型")}
             </span>
             <span className={`chip ${cloud?.available ? "chip-ok" : "chip-warn"}`}>
-              云端翻译：{cloud?.available ? "可用（按量计费）" : "不可用"}
+              {cloud?.available ? t("云端翻译：可用（按量计费）") : t("云端翻译：不可用")}
             </span>
           </div>
           <p className="mt-2 text-xs leading-relaxed text-ink-3">
-            本软件不上报任何使用数据；除首次下载模型权重与可选的云端调用外，运行期不发任何外部请求。
+            {t("本软件不上报任何使用数据；除首次下载模型权重与可选的云端调用外，运行期不发任何外部请求。")}
           </p>
         </Section>
 
@@ -353,7 +372,7 @@ export function SettingsPanel() {
               })
             }
           >
-            保存设置
+            {t("保存设置")}
           </button>
         </div>
       </div>
@@ -390,11 +409,14 @@ function StatusCard({
   detail: string;
   lines: string[];
 }) {
+  const t = useT();
   return (
     <div className="rounded-xl border border-line bg-surface p-3">
       <div className="flex items-center justify-between">
         <span className="text-sm font-medium">{title}</span>
-        <span className={`chip ${available ? "chip-ok" : "chip-warn"}`}>{available ? "可用" : "不可用"}</span>
+        <span className={`chip ${available ? "chip-ok" : "chip-warn"}`}>
+          {available ? t("可用") : t("不可用")}
+        </span>
       </div>
       <div className="mt-1 text-xs text-ink-2">{detail}</div>
       {lines.map((line) => (

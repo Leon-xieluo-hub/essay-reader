@@ -2,6 +2,7 @@ import { memo, useMemo, useState } from "react";
 import katex from "katex";
 
 import type { DocBlock } from "../api/types";
+import { useT } from "../i18n";
 import { useApp, type ReadingMode } from "../store";
 
 interface Props {
@@ -28,12 +29,17 @@ export const BlockView = memo(function BlockView({
   const [comment, setComment] = useState("");
   const addNote = useApp((s) => s.addNote);
   const provider = useApp((s) => s.provider);
+  const t = useT();
 
   const translation = block.translations[provider] || Object.values(block.translations)[0] || "";
   const meta = block.translation_meta[provider];
   const quality = meta?.quality;
 
   const highlight = useMemo(() => (text: string) => markText(text, search), [search]);
+  const richOriginal = useMemo(
+    () => renderEmphasis(block.text, block.emphasis, highlight),
+    [block.text, block.emphasis, highlight],
+  );
 
   // --------------------------------------------------------------- equations
   // Cropped equation images are the reliable representation: the PDF text layer
@@ -51,7 +57,11 @@ export const BlockView = memo(function BlockView({
       >
         <button
           className="block w-full"
-          title={block.text ? `原文文本：${block.text.slice(0, 120)}` : "公式原图"}
+          title={
+            block.text
+              ? t("原文文本：{text}", { text: block.text.slice(0, 120) })
+              : t("公式原图")
+          }
           onClick={(event) => {
             event.stopPropagation();
             openLightbox(block.image_url as string, block.text.slice(0, 200));
@@ -65,7 +75,7 @@ export const BlockView = memo(function BlockView({
           />
         </button>
         <figcaption className="mt-1 text-center text-[11px] text-ink-3">
-          公式按原版面截取（文本层顺序错乱，故不做文字重排）
+          {t("公式按原版面截取（文本层顺序错乱，故不做文字重排）")}
         </figcaption>
       </figure>
     );
@@ -86,8 +96,8 @@ export const BlockView = memo(function BlockView({
         }}
       >
         <div className="mb-1 flex items-center gap-2 text-[11px] text-ink-3">
-          <span className="chip">文章信息</span>
-          <span>非正文内容（出版商元信息栏）</span>
+          <span className="chip">{t("文章信息")}</span>
+          <span>{t("非正文内容（出版商元信息栏）")}</span>
         </div>
         <p className="text-[0.85em] leading-relaxed text-ink-2">{highlight(block.text)}</p>
       </div>
@@ -122,7 +132,7 @@ export const BlockView = memo(function BlockView({
           </button>
         ) : (
           <div className="rounded-xl border border-dashed border-line-2 p-6 text-center text-xs text-ink-3">
-            该区域疑似图片但未能裁切，请切换到「原版页」查看
+            {t("该区域疑似图片但未能裁切，请切换到「原版页」查看")}
           </div>
         )}
         {(block.caption || translation) && (
@@ -178,14 +188,14 @@ export const BlockView = memo(function BlockView({
         }}
       >
         <div className="mb-1 flex items-center gap-2 text-[11px] text-ink-3">
-          <span className="chip">表格</span>
+          <span className="chip">{t("表格")}</span>
           <span>
             {showTranslated
-              ? "已按行列翻译 · 可与原表对照"
-              : "解析为结构化数据，可横向滚动"}
+              ? t("已按行列翻译 · 可与原表对照")
+              : t("解析为结构化数据，可横向滚动")}
           </span>
           <button className="btn btn-ghost !px-1.5 !py-0.5 !text-[11px]" onClick={onRetranslate}>
-            重译此表
+            {t("重译此表")}
           </button>
         </div>
         {primaryRows?.length ? (
@@ -193,7 +203,7 @@ export const BlockView = memo(function BlockView({
             {renderGrid(primaryRows, false)}
             {showPair && (
               <details className="text-[11px] text-ink-3">
-                <summary className="cursor-pointer">查看原表（未翻译）</summary>
+                <summary className="cursor-pointer">{t("查看原表（未翻译）")}</summary>
                 <div className="mt-1">{renderGrid(block.table_rows as string[][], true)}</div>
               </details>
             )}
@@ -225,7 +235,7 @@ export const BlockView = memo(function BlockView({
   const body = (
     <>
       {showOriginal && block.type !== "formula" && (
-        <p className={isHeading ? "" : "text-ink"}>{highlight(block.text)}</p>
+        <p className={isHeading ? "" : "text-ink"}>{richOriginal}</p>
       )}
       {block.type === "formula" && (
         <FormulaBlock text={block.text} latex={block.latex} highlight={highlight} />
@@ -238,7 +248,7 @@ export const BlockView = memo(function BlockView({
         </p>
       )}
       {showTranslation && !translation && provider !== "off" && (
-        <p className="mt-1 text-[0.85em] text-ink-3">（尚未翻译 · 悬停段落可单段翻译）</p>
+        <p className="mt-1 text-[0.85em] text-ink-3">{t("（尚未翻译 · 悬停段落可单段翻译）")}</p>
       )}
     </>
   );
@@ -273,27 +283,27 @@ export const BlockView = memo(function BlockView({
       {body}
 
       <div className="mt-1 hidden items-center gap-1.5 text-[11px] text-ink-3 group-hover:flex">
-        <span>第 {block.page + 1} 页</span>
+        <span>{t("第 {page} 页", { page: block.page + 1 })}</span>
         {quality === "suspect" && (
-          <span className="chip chip-warn" title="质量校验未通过（数字/引用/占位符不一致），建议核对">
-            待复核
+          <span className="chip chip-warn" title={t("质量校验未通过（数字/引用/占位符不一致），建议核对")}>
+            {t("待复核")}
           </span>
         )}
-        {quality === "failed" && <span className="chip chip-danger">翻译失败</span>}
+        {quality === "failed" && <span className="chip chip-danger">{t("翻译失败")}</span>}
         <button className="btn btn-ghost !px-1.5 !py-0.5 !text-[11px]" onClick={onRetranslate}>
-          重译
+          {t("重译")}
         </button>
         <button
           className="btn btn-ghost !px-1.5 !py-0.5 !text-[11px]"
           onClick={() => setAdding((value) => !value)}
         >
-          笔记
+          {t("笔记")}
         </button>
         <button
           className="btn btn-ghost !px-1.5 !py-0.5 !text-[11px]"
           onClick={() => setDockTab("chat")}
         >
-          就此提问
+          {t("就此提问")}
         </button>
       </div>
 
@@ -302,23 +312,23 @@ export const BlockView = memo(function BlockView({
           <textarea
             className="textarea"
             rows={2}
-            placeholder="写点批注…（会保存到本地）"
+            placeholder={t("写点批注…（会保存到本地）")}
             value={comment}
             onChange={(event) => setComment(event.target.value)}
           />
           <div className="mt-1.5 flex justify-end gap-2">
             <button className="btn" onClick={() => setAdding(false)}>
-              取消
+              {t("取消")}
             </button>
             <button
               className="btn btn-primary"
               onClick={() => {
-                void addNote(block.id, block.text.slice(0, 240), comment || "（无批注）");
+                void addNote(block.id, block.text.slice(0, 240), comment || t("（无批注）"));
                 setComment("");
                 setAdding(false);
               }}
             >
-              保存
+              {t("保存")}
             </button>
           </div>
         </div>
@@ -336,6 +346,7 @@ function FormulaBlock({
   latex: string | null;
   highlight: (value: string) => React.ReactNode;
 }) {
+  const t = useT();
   const rendered = useMemo(() => {
     if (!latex) return null;
     try {
@@ -351,14 +362,49 @@ function FormulaBlock({
   return (
     <p className="my-2 rounded-lg bg-paper-2 px-3 py-2 font-mono text-[0.92em]">
       {highlight(text)}
-      <span className="ml-2 chip">公式原文（可切原版页核对）</span>
+      <span className="ml-2 chip">{t("公式原文（可切原版页核对）")}</span>
     </p>
   );
 }
 
+/** Render a block's text with the bold/italic runs the PDF carried. */
+export function renderEmphasis(
+  text: string,
+  emphasis: { start: number; end: number; style: string }[] | undefined,
+  highlight: (value: string) => React.ReactNode,
+): React.ReactNode {
+  if (!emphasis || emphasis.length === 0) return highlight(text);
+  const runs = [...emphasis]
+    .filter((run) => run.start < run.end && run.start < text.length)
+    .sort((a, b) => a.start - b.start);
+  if (!runs.length) return highlight(text);
+  const nodes: React.ReactNode[] = [];
+  let cursor = 0;
+  for (const [index, run] of runs.entries()) {
+    const start = Math.max(run.start, cursor);
+    const end = Math.min(run.end, text.length);
+    if (end <= start) continue;
+    if (start > cursor) {
+      nodes.push(<span key={`plain-${index}`}>{highlight(text.slice(cursor, start))}</span>);
+    }
+    const inner = run.style.includes("italic")
+      ? <em>{highlight(text.slice(start, end))}</em>
+      : highlight(text.slice(start, end));
+    nodes.push(
+      <strong key={`emph-${index}`} className="font-semibold">
+        {inner}
+      </strong>,
+    );
+    cursor = end;
+  }
+  if (cursor < text.length) {
+    nodes.push(<span key="tail">{highlight(text.slice(cursor))}</span>);
+  }
+  return nodes;
+}
+
 /** Wrap search hits in <mark> without dangerouslySetInnerHTML. */
-export function markText(text: string, needle: string): React.ReactNode {
-  const query = needle.trim();
+export function markText(text: string, needle: string): React.ReactNode {  const query = needle.trim();
   if (!query) return text;
   const lowerText = text.toLowerCase();
   const lowerQuery = query.toLowerCase();

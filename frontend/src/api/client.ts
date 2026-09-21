@@ -1,3 +1,5 @@
+import { t } from "../i18n/translate";
+
 import type {
   AskAnswer,
   DocBlock,
@@ -71,7 +73,7 @@ export const api = {
         if (xhr.status >= 200 && xhr.status < 300) {
           resolve(JSON.parse(xhr.responseText) as DocumentDetail);
         } else {
-          let detail = `上传失败（${xhr.status}）`;
+          let detail = t("上传失败（{status}）", { status: xhr.status });
           try {
             const body = JSON.parse(xhr.responseText);
             if (body?.detail) detail = body.detail;
@@ -81,7 +83,7 @@ export const api = {
           reject(new Error(detail));
         }
       };
-      xhr.onerror = () => reject(new Error("网络错误：无法连接到本地服务"));
+      xhr.onerror = () => reject(new Error(t("网络错误：无法连接到本地服务")));
       xhr.send(form);
     }),
 

@@ -1,6 +1,7 @@
 import { create } from "zustand";
 
 import { api } from "./api/client";
+import { UI_LANG_KEY, bindLangGetter, detectUiLang, t, type UiLang } from "./i18n/translate";
 import type {
   AskAnswer,
   DocBlock,
@@ -45,6 +46,7 @@ interface AppState {
   // reading
   mode: ReadingMode;
   lang: string;
+  uiLang: UiLang;
   provider: ProviderKey;
   ocrMode: OcrMode;
   theme: ThemeChoice;
@@ -83,6 +85,7 @@ interface AppState {
 
   setMode: (mode: ReadingMode) => void;
   setLang: (lang: string) => void;
+  setUiLang: (lang: UiLang) => void;
   setOcrMode: (mode: OcrMode) => void;
   setTheme: (theme: ThemeChoice) => void;
   setProvider: (provider: ProviderKey) => Promise<void>;
@@ -153,6 +156,7 @@ export const useApp = create<AppState>((set, get) => ({
 
   mode: (localStorage.getItem(MODE_KEY) as ReadingMode) || "bilingual",
   lang: localStorage.getItem(LANG_KEY) || "zh",
+  uiLang: detectUiLang(),
   provider: (localStorage.getItem(PROVIDER_KEY) as ProviderKey) || "off",
   ocrMode: (localStorage.getItem(OCR_KEY) as OcrMode) || "auto",
   theme: (localStorage.getItem(THEME_KEY) as ThemeChoice) || "system",
@@ -198,7 +202,7 @@ export const useApp = create<AppState>((set, get) => ({
         set({ ocrMode: environment.ocr.mode });
       }
     } catch (error) {
-      get().toast("error", `无法连接本地服务：${(error as Error).message}`);
+      get().toast("error", t("无法连接本地服务：{msg}", { msg: (error as Error).message }));
     }
   },
 
@@ -230,7 +234,7 @@ export const useApp = create<AppState>((set, get) => ({
 
   closeDocument() {
     set({ doc: null, blocks: [], summary: "", notes: [], glossary: [], chat: [], task: null });
-    document.title = "Essay Reader · 文献阅读器";
+    document.title = t("Essay Reader · 文献阅读器");
   },
 
   async upload(file) {
@@ -243,11 +247,19 @@ export const useApp = create<AppState>((set, get) => ({
       const report = doc.parse_report;
       const quality = report ? Math.round(qualityScore(report)) : 100;
       const channel = report?.ocr_pages
-        ? ` · OCR ${report.ocr_pages} 页（置信度 ${(report.ocr_confidence * 100).toFixed(0)}%）`
+        ? t(" · OCR {pages} 页（置信度 {conf}%）", {
+              pages: report.ocr_pages,
+              conf: (report.ocr_confidence * 100).toFixed(0),
+            })
         : "";
       get().toast(
         "ok",
-        `解析完成：${doc.page_count} 页 · 质量 ${quality} 分${channel} · ${report?.duration_ms ?? 0}ms`,
+        t("解析完成：{pages} 页 · 质量 {quality} 分{channel} · {ms}ms", {
+          pages: doc.page_count,
+          quality,
+          channel,
+          ms: report?.duration_ms ?? 0,
+        }),
       );
       if (report?.warnings?.length) {
         for (const warning of report.warnings.slice(0, 2)) get().toast("warn", warning);
@@ -269,7 +281,7 @@ export const useApp = create<AppState>((set, get) => ({
         get().closeDocument();
       }
       await get().refreshDocuments();
-      get().toast("ok", "已删除文献及本地缓存");
+      get().toast("ok", t("已删除文献及本地缓存"));
     } catch (error) {
       get().toast("error", (error as Error).message);
     }
@@ -279,7 +291,6 @@ export const useApp = create<AppState>((set, get) => ({
     localStorage.setItem(MODE_KEY, mode);
     set({ mode });
   },
-
   setOcrMode(mode) {
     localStorage.setItem(OCR_KEY, mode);
     set({ ocrMode: mode });
@@ -293,6 +304,11 @@ export const useApp = create<AppState>((set, get) => ({
       void get().loadBlocks(lang);
       void api.summary(get().doc!.id, lang).then((res) => set({ summary: res.content }));
     }
+  },
+
+  setUiLang(uiLang) {
+    localStorage.setItem(UI_LANG_KEY, uiLang);
+    set({ uiLang });
   },
 
   setTheme(theme) {    localStorage.setItem(THEME_KEY, theme);
@@ -407,10 +423,10 @@ export const useApp = create<AppState>((set, get) => ({
     if (!doc) return;
     const provider = get().provider;
     if (provider === "off") {
-      get().toast("warn", "AI 功能已关闭：请先在设置中启用本地模型或配置云端 API");
+      get().toast("warn", t("AI 功能已关闭：请先在设置中启用本地模型或配置云端 API"));
       return;
     }
-    const label = provider === "local" ? "本地模型" : "云端模型";
+    const label = provider === "local" ? t("本地模型") : t("云端模型");
     try {
       const task = await api.translate({
         doc_id: doc.id,
@@ -421,7 +437,7 @@ export const useApp = create<AppState>((set, get) => ({
         force: options?.force,
       });
       set({ task });
-      get().toast("info", `${label}开始翻译…`);
+      get().toast("info", t("{label}开始翻译…", { label }));
       startPolling(get, set, task, async () => {
         await get().loadBlocks();
         await get().refreshUsage();
@@ -440,7 +456,7 @@ export const useApp = create<AppState>((set, get) => ({
     if (!doc) return;
     const provider = get().provider;
     if (provider === "off") {
-      get().toast("warn", "AI 功能已关闭：请先启用模型通道");
+      get().toast("warn", t("AI 功能已关闭：请先启用模型通道"));
       return;
     }
     try {
@@ -482,7 +498,10 @@ export const useApp = create<AppState>((set, get) => ({
       await get().refreshUsage();
     } catch (error) {
       set({
-        chat: [...get().chat, { role: "assistant", text: `出错：${(error as Error).message}` }],
+        chat: [
+          ...get().chat,
+          { role: "assistant", text: t("出错：{msg}", { msg: (error as Error).message }) },
+        ],
       });
     }
   },
@@ -503,7 +522,7 @@ export const useApp = create<AppState>((set, get) => ({
     try {
       await api.addNote({ doc_id: doc.id, block_id: blockId, quote, comment });
       await Promise.all([get().loadNotes(), get().loadBlocks()]);
-      get().toast("ok", "已保存笔记");
+      get().toast("ok", t("已保存笔记"));
     } catch (error) {
       get().toast("error", (error as Error).message);
     }
@@ -525,7 +544,7 @@ export const useApp = create<AppState>((set, get) => ({
     if (!doc) return;
     try {
       set({ glossary: await api.saveTerm(doc.id, { source, target, note }) });
-      get().toast("ok", "术语已更新，将应用于后续翻译");
+      get().toast("ok", t("术语已更新，将应用于后续翻译"));
     } catch (error) {
       get().toast("error", (error as Error).message);
     }
@@ -544,7 +563,7 @@ export const useApp = create<AppState>((set, get) => ({
     try {
       const res = await api.buildGlossary(doc.id, get().provider, get().lang);
       set({ glossary: res.terms });
-      get().toast("ok", `已抽取 ${res.terms.length} 条术语`);
+      get().toast("ok", t("已抽取 {count} 条术语", { count: res.terms.length }));
     } catch (error) {
       get().toast("error", (error as Error).message);
     }
@@ -557,7 +576,12 @@ export const useApp = create<AppState>((set, get) => ({
       set({ providers: await api.providers() });
       const environment = await api.environment();
       set({ environment });
-      get().toast("ok", res.changed.length ? `已更新：${res.changed.join(", ")}` : "设置未变化");
+      get().toast(
+          "ok",
+          res.changed.length
+            ? t("已更新：{fields}", { fields: res.changed.join(", ") })
+            : t("设置未变化"),
+        );
     } catch (error) {
       get().toast("error", (error as Error).message);
     }
@@ -628,7 +652,7 @@ function startPolling(
         if (latest.status === "done") {
           get().toast("ok", describeTaskDone(latest));
         } else {
-          get().toast("error", latest.error || "任务失败");
+          get().toast("error", latest.error || t("任务失败"));
         }
       }
     } catch {
@@ -642,15 +666,18 @@ function describeTaskDone(task: TaskState): string {
   try {
     const payload = JSON.parse(task.message || "{}");
     if (task.kind === "translate") {
-      const parts = [`已翻译 ${payload.translated ?? 0} 段`];
-      if (payload.skipped) parts.push(`复用缓存 ${payload.skipped} 段`);
-      if (payload.suspect) parts.push(`待复核 ${payload.suspect} 段`);
-      if (payload.failed) parts.push(`失败 ${payload.failed} 段`);
+      const parts = [t("已翻译 {count} 段", { count: payload.translated ?? 0 })];
+      if (payload.skipped) parts.push(t("复用缓存 {count} 段", { count: payload.skipped }));
+      if (payload.suspect) parts.push(t("待复核 {count} 段", { count: payload.suspect }));
+      if (payload.failed) parts.push(t("失败 {count} 段", { count: payload.failed }));
       return parts.join(" · ");
     }
-    if (task.kind === "summary") return "要点总结已生成";
+    if (task.kind === "summary") return t("要点总结已生成");
   } catch {
     /* fall through */
   }
-  return "任务完成";
+  return t("任务完成");
 }
+
+// Non-React call sites (task messages, api errors) need the live UI language.
+bindLangGetter(() => useApp.getState().uiLang);
