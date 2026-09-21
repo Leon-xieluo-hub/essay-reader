@@ -53,6 +53,12 @@ interface AppState {
   fontScale: number;
   activeBlockId: string | null;
   scrolledBlockId: string | null;
+  /** anchor for the text reading views — lives here so it survives switching to
+   *  the original-page view, which unmounts the reading pane */
+  scrollAnchorId: string | null;
+  /** the original-page view keeps its own position; it is never synced with the
+   *  text views (a rendered page image has no paragraph anchors to align to) */
+  pdfPage: number;
   search: string;
   searchHits: string[];
   searchIndex: number;
@@ -92,6 +98,8 @@ interface AppState {
   setFontScale: (scale: number) => void;
   setActiveBlock: (blockId: string | null) => void;
   setScrolledBlock: (blockId: string | null) => void;
+  setScrollAnchor: (blockId: string | null) => void;
+  setPdfPage: (page: number) => void;
   setSearch: (value: string) => void;
   cycleSearchHit: (delta: number) => void;
 
@@ -163,6 +171,8 @@ export const useApp = create<AppState>((set, get) => ({
   fontScale: Number(localStorage.getItem("essay-reader:scale") || "1"),
   activeBlockId: null,
   scrolledBlockId: null,
+  scrollAnchorId: null,
+  pdfPage: 0,
   search: "",
   searchHits: [],
   searchIndex: 0,
@@ -215,7 +225,18 @@ export const useApp = create<AppState>((set, get) => ({
   },
 
   async openDocument(docId) {
-    set({ loadingDoc: true, search: "", searchHits: [], chat: [] });
+    // Positions belong to a document: start a newly opened paper at the top of
+    // both the text views and the original-page view.
+    set({
+      loadingDoc: true,
+      search: "",
+      searchHits: [],
+      chat: [],
+      scrollAnchorId: null,
+      scrolledBlockId: null,
+      activeBlockId: null,
+      pdfPage: 0,
+    });
     try {
       const doc = await api.getDocument(docId);
       set({ doc, loadingDoc: false });
@@ -339,6 +360,14 @@ export const useApp = create<AppState>((set, get) => ({
 
   setScrolledBlock(blockId) {
     set({ scrolledBlockId: blockId });
+  },
+
+  setScrollAnchor(blockId) {
+    set({ scrollAnchorId: blockId });
+  },
+
+  setPdfPage(page) {
+    set({ pdfPage: page });
   },
 
   setSearch(value) {

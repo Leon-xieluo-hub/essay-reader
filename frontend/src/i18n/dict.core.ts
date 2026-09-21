@@ -110,4 +110,5 @@ export const CORE_DICT: Record<string, string> = {
   "非正文内容（出版商元信息栏）": "Not body text (publisher metadata rail)",
   "（尚未翻译 · 悬停段落可单段翻译）": "(not translated yet · hover a paragraph to translate it alone)",
   "（无批注）": "(no note)",
+  "此视图有独立的阅读位置，不与双语 / 译文 / 原文联动。": "This view keeps its own reading position and is not linked to Bilingual / Translation / Original.",
 };

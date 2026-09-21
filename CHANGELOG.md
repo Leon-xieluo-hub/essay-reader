@@ -27,6 +27,13 @@ Follow-up to 0.2.0, after testing the fixes in the running app.
 
 ### Changed
 
+- **The original-page view no longer takes part in position syncing.** A page is a
+  rendered image, so there is no paragraph anchor to align to and the view always
+  landed at the top; it now keeps its own place (remembered per document) and is
+  never linked to the text views.
+- The reading position of 双语 / 译文 / 原文 survives a detour through the
+  original-page view: the anchor moved into the store, because that view unmounts
+  the reading pane and the anchor used to be lost with it.
 - The interface language switch is easier to find: the top-bar control reads
   `中 / EN` (instead of a single glyph) and the same switch also appears in
   Settings → Reading and appearance, with a note that it follows the system by

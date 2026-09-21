@@ -16,6 +16,10 @@ export function PdfPane() {
   const blocks = useApp((s) => s.blocks);
   const activeBlockId = useApp((s) => s.activeBlockId);
   const setActiveBlock = useApp((s) => s.setActiveBlock);
+  const pdfPage = useApp((s) => s.pdfPage);
+  const setPdfPage = useApp((s) => s.setPdfPage);
+  const scrollerRef = useRef<HTMLDivElement>(null);
+  const restored = useRef(0);
 
   const [pdf, setPdf] = useState<pdfjs.PDFDocumentProxy | null>(null);
   const [error, setError] = useState("");
@@ -38,6 +42,36 @@ export function PdfPane() {
     };
   }, [doc]);
 
+  // This view keeps its own position and is deliberately NOT synced with the
+  // text views: a page is a rendered image, so there is no paragraph anchor to
+  // align to, and any attempt would land at the top of the document anyway.
+  useEffect(() => {
+    const container = scrollerRef.current;
+    if (!container || !pdf) return;
+    const onScroll = () => {
+      const top = container.getBoundingClientRect().top + 120;
+      let current = 0;
+      for (let index = 0; index < pdf.numPages; index += 1) {
+        const element = document.getElementById(`pdfpage-${index}`);
+        if (!element) continue;
+        if (element.getBoundingClientRect().top <= top) current = index;
+        else break;
+      }
+      setPdfPage(current);
+    };
+    container.addEventListener("scroll", onScroll, { passive: true });
+    return () => container.removeEventListener("scroll", onScroll);
+  }, [pdf, setPdfPage]);
+
+  // restore this view's own position once, after the placeholder pages exist
+  useEffect(() => {
+    if (!pdf || pdfPage <= 0 || restored.current === pdfPage) return;
+    const element = document.getElementById(`pdfpage-${pdfPage}`);
+    if (!element) return;
+    restored.current = pdfPage;
+    element.scrollIntoView({ block: "start" });
+  }, [pdf, pdfPage]);
+
   if (error) {
     return <div className="flex h-full items-center justify-center text-sm text-danger">{error}</div>;
   }
@@ -50,9 +84,12 @@ export function PdfPane() {
   }
 
   return (
-    <div className="h-full overflow-y-auto bg-paper-3/50 px-4 py-6">
+    <div ref={scrollerRef} className="h-full overflow-y-auto bg-paper-3/50 px-4 py-6">
       <p className="mx-auto mb-3 max-w-[820px] text-center text-[11px] text-ink-3">
         {t("原版页模式：按真实排版渲染，选中段落会在页面上高亮对应区域 —— 这是核对解析与图表位置的最可靠方式。")}
+      </p>
+      <p className="mx-auto mb-4 max-w-[820px] text-center text-[11px] text-ink-3">
+        {t("此视图有独立的阅读位置，不与双语 / 译文 / 原文联动。")}
       </p>
       <div className="mx-auto flex max-w-[820px] flex-col gap-6">
         {Array.from({ length: pdf.numPages }, (_, index) => (

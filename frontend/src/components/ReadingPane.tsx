@@ -15,6 +15,8 @@ export function ReadingPane() {
   const activeBlockId = useApp((s) => s.activeBlockId);
   const setActiveBlock = useApp((s) => s.setActiveBlock);
   const setScrolledBlock = useApp((s) => s.setScrolledBlock);
+  const setScrollAnchor = useApp((s) => s.setScrollAnchor);
+  const storedAnchor = useApp((s) => s.scrollAnchorId);
   const translateBlock = useApp((s) => s.translateBlock);
   const searchIndex = useApp((s) => s.searchIndex);
   const searchHits = useApp((s) => s.searchHits);
@@ -56,25 +58,29 @@ export function ReadingPane() {
         }
       }
       if (anchor) anchorRef.current = anchor;
+      if (anchor) setScrollAnchor(anchor);
       if (current) setScrolledBlock(current);
     };
     container.addEventListener("scroll", onScroll, { passive: true });
     onScroll();
     return () => container.removeEventListener("scroll", onScroll);
-  }, [body, setScrolledBlock]);
+  }, [body, setScrolledBlock, setScrollAnchor]);
 
   // Switching 双语 / 译文 / 原文 rewrites every block, so keep the paragraph the
   // reader was looking at pinned to the top instead of jumping to the beginning.
+  // The anchor lives in the store because the original-page view unmounts this
+  // component, and coming back should not drop the reader at the top either.
   useLayoutEffect(() => {
     const container = document.getElementById("reading-scroll");
-    const id = anchorRef.current;
+    const id = anchorRef.current ?? storedAnchor;
     if (!container || !id) return;
     const element = document.getElementById(`block-${id}`);
     if (!element) return;
+    anchorRef.current = id;
     const delta =
       element.getBoundingClientRect().top - container.getBoundingClientRect().top - 12;
     if (Math.abs(delta) > 1) container.scrollTop += delta;
-  }, [mode]);
+  }, [mode, body, storedAnchor]);
 
   // jump to the active search hit
   useEffect(() => {
