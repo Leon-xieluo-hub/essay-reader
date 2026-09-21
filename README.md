@@ -176,6 +176,7 @@ frontend/
 scripts/setup.ps1        first-time dependency install and build (run the app via start.ps1)
 .env.example             every configurable setting with comments
 README.md / README.zh-CN.md   English / Chinese docs (GitHub shows this file)
+CHANGELOG.md / CHANGELOG.zh-CN.md   release notes per version
 images/                  README screenshots
 ```
 

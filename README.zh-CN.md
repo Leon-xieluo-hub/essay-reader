@@ -179,6 +179,7 @@ frontend/
 scripts/setup.ps1        首次安装依赖并构建（运行应用请用根目录的 start.ps1 / 启动文献阅读器.cmd）
 .env.example             全部可配置项与说明
 README.md / README.zh-CN.md   英文 / 中文说明（GitHub 首屏为英文版）
+CHANGELOG.md / CHANGELOG.zh-CN.md   各版本更新说明
 images/                  README 配图
 ```
 
