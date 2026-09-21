@@ -5,6 +5,33 @@
 Notable changes to Essay Reader, newest first. Versions are tagged in this
 repository; the tag pages carry the same notes.
 
+## 0.2.1 — 2026-09-21
+
+Follow-up to 0.2.0, after testing the fixes in the running app.
+
+### Fixed
+
+- **Bold/italic were missed in Elsevier-style PDFs.** Subset fonts often expose
+  the style only as a name suffix (`AdvTT28000ce1.B`, `AdvTT94c8263f.I`) while
+  leaving PyMuPDF's bold and italic flag bits clear, so a whole paper came back
+  with no styling at all. Name suffixes are now recognised too: the Comprehensive
+  review went from 0 to 96 styled blocks.
+- **A rebuilt interface could be masked by the browser cache.** The SPA shell is
+  now served with `no-cache, must-revalidate` and the content-hashed bundles with
+  `immutable`, so a UI change always shows up on a normal refresh.
+- **Library documents kept the parse they were uploaded with.** Parses are cached
+  by file hash, so a paper uploaded before a parser fix keeps its old
+  segmentation, and re-uploading the same file returns the cached copy. All
+  library documents have been re-parsed; `GET /api/documents/{id}` now also
+  reports `emphasis` so you can tell which parse you are looking at.
+
+### Changed
+
+- The interface language switch is easier to find: the top-bar control reads
+  `中 / EN` (instead of a single glyph) and the same switch also appears in
+  Settings → Reading and appearance, with a note that it follows the system by
+  default.
+
 ## 0.2.0 — 2026-09-21
 
 Parser overhaul driven by nine real papers (8–21 pages, single- and two-column,

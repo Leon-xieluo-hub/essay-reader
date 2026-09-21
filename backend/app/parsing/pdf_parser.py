@@ -1492,11 +1492,19 @@ class PDFParser:
                 continue
             font = str(span.get("font", "")).lower()
             flags = int(span.get("flags", 0) or 0)
-            bold = bool(flags & 2 ** 4) or any(
-                token in font for token in ("bold", "black", "semibold", "demi")
+            # Subset fonts often expose the style only as a name suffix
+            # ("AdvTT28000ce1.B" for bold, ".I" for italic) while leaving the
+            # bold/italic flag bits clear, which is common in Elsevier PDFs.
+            stem = font.rsplit("+", 1)[0].rstrip()
+            bold = (
+                bool(flags & 2 ** 4)
+                or any(token in font for token in ("bold", "black", "semibold", "demi"))
+                or stem.endswith((".b", "-b", ",b", ".bd", "-bd"))
             )
-            italic = bool(flags & 2 ** 1) or any(
-                token in font for token in ("italic", "oblique")
+            italic = (
+                bool(flags & 2 ** 1)
+                or any(token in font for token in ("italic", "oblique"))
+                or stem.endswith((".i", "-i", ",i", ".it", "-it", ".ob"))
             )
             if runs and runs[-1][1] == bold and runs[-1][2] == italic:
                 runs[-1] = (runs[-1][0] + text, bold, italic)

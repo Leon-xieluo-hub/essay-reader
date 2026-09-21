@@ -869,11 +869,18 @@ async def assets(path: str):
     Figure crops live in the data directory; the Vite bundle lives in
     `frontend/dist/assets`. Data assets win so a document can never shadow the
     app's own JavaScript.
+
+    Cache headers matter here: the bundle name carries a content hash, so it can
+    be cached forever, while a rebuilt bundle must never be masked by a stale
+    entry in the browser (that is how a UI change goes missing).
     """
-    for base in (ASSET_DIR.resolve(), (FRONTEND_DIST / "assets").resolve()):
+    for base, cache in (
+        (ASSET_DIR.resolve(), "public, max-age=86400"),
+        ((FRONTEND_DIST / "assets").resolve(), "public, max-age=31536000, immutable"),
+    ):
         candidate = (base / path).resolve()
         if str(candidate).startswith(str(base)) and candidate.is_file():
-            return FileResponse(candidate)
+            return FileResponse(candidate, headers={"Cache-Control": cache})
     raise HTTPException(404, "资源不存在")
 
 
@@ -882,13 +889,16 @@ async def assets(path: str):
 # app runs on one port with no dev server and no network access.
 
 _INDEX_FILE = FRONTEND_DIST / "index.html"
+# The shell is never cached: after `npm run build` the browser must pick up the
+# new bundle hash immediately instead of reusing a heuristically fresh copy.
+_NO_CACHE = {"Cache-Control": "no-cache, must-revalidate"}
 
 if _INDEX_FILE.exists():
     app.mount("/app", StaticFiles(directory=FRONTEND_DIST), name="spa")
 
     @app.get("/")
     async def spa_root() -> FileResponse:
-        return FileResponse(_INDEX_FILE)
+        return FileResponse(_INDEX_FILE, headers=_NO_CACHE)
 
     @app.get("/{full_path:path}")
     async def spa_fallback(full_path: str) -> FileResponse:
@@ -899,6 +909,12 @@ if _INDEX_FILE.exists():
         for candidate in (base / full_path, base / "assets" / full_path):
             resolved = candidate.resolve()
             if str(resolved).startswith(str(base)) and resolved.is_file():
-                return FileResponse(resolved)
-        return FileResponse(_INDEX_FILE)
+                assets_dir = base / "assets"
+                headers = (
+                    {"Cache-Control": "public, max-age=31536000, immutable"}
+                    if str(resolved).startswith(str(assets_dir))
+                    else _NO_CACHE
+                )
+                return FileResponse(resolved, headers=headers)
+        return FileResponse(_INDEX_FILE, headers=_NO_CACHE)
 

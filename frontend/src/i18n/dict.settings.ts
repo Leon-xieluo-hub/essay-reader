@@ -107,4 +107,8 @@ export const SETTINGS_DICT: Record<string, string> = {
 
   // Save
   "保存设置": "Save settings",
+
+  // --- interface language ---
+  "界面语言": "Interface language",
+  "默认跟随系统语言": "Follows your system language by default",
 };

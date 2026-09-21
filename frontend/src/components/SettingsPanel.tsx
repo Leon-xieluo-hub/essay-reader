@@ -14,6 +14,8 @@ export function SettingsPanel() {
   const usage = useApp((s) => s.usage);
   const theme = useApp((s) => s.theme);
   const setTheme = useApp((s) => s.setTheme);
+  const uiLang = useApp((s) => s.uiLang);
+  const setUiLang = useApp((s) => s.setUiLang);
   const fontScale = useApp((s) => s.fontScale);
   const setFontScale = useApp((s) => s.setFontScale);
   const saveSettings = useApp((s) => s.saveSettings);
@@ -317,6 +319,27 @@ export function SettingsPanel() {
 
         <Section title={t("阅读与外观")}>
           <div className="flex flex-wrap items-center gap-3 text-sm">
+            <span>{t("界面语言")}</span>
+            <div className="flex items-center gap-1 rounded-xl border border-line bg-surface p-0.5">
+              {(
+                [
+                  { key: "zh", label: "简体中文" },
+                  { key: "en", label: "English" },
+                ] as const
+              ).map((item) => (
+                <button
+                  key={item.key}
+                  className="btn btn-ghost !px-2.5 !py-1"
+                  data-active={uiLang === item.key}
+                  onClick={() => setUiLang(item.key)}
+                >
+                  {item.label}
+                </button>
+              ))}
+            </div>
+            <span className="text-xs text-ink-3">{t("默认跟随系统语言")}</span>
+          </div>
+          <div className="mt-3 flex flex-wrap items-center gap-3 text-sm">
             <span>{t("主题")}</span>
             <select className="select !w-32" value={theme} onChange={(e) => setTheme(e.target.value as never)}>
               <option value="system">{t("跟随系统")}</option>

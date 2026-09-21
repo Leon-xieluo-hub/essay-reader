@@ -320,6 +320,8 @@ export function TopBar() {
           onClick={() => setUiLang(uiLang === "zh" ? "en" : "zh")}
         >
           {uiLang === "en" ? "EN" : "中"}
+          <span className="ml-1 text-[11px] text-ink-3">/</span>
+          <span className="ml-1 text-[11px] text-ink-3">{uiLang === "en" ? "中" : "EN"}</span>
         </button>
         <button
           className="btn btn-ghost"
